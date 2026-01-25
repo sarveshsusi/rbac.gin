@@ -1,18 +1,18 @@
 package service
 
 import (
-	
 	"errors"
 	"fmt"
+	"log"
 	"time"
-
+"crypto/rand"
 	"github.com/google/uuid"
 
+	"math/big"
 	"rbac/config"
 	"rbac/models"
 	"rbac/repository"
 	"rbac/utils"
-	"math/rand"
 )
 
 type AuthService struct {
@@ -50,6 +50,15 @@ type UserInfo struct {
 	Name  string    `json:"name"`
 	Email string    `json:"email"`
 	Role  models.Role `json:"role"`
+}
+
+type GetuserInfo struct {
+	ID    uuid.UUID `json:"id"`
+	Name  string    `json:"name"`
+	Email string    `json:"email"`
+	Role  models.Role `json:"role"`
+	CreatedAt time.Time `json:"created_at"`
+	IsActive  bool      `json:"is_active"`
 }
 
 
@@ -95,15 +104,7 @@ func (s *AuthService) Login(
 		return nil, err
 	}
 
-	return &LoginResponse{
-		AccessToken:  "",
-		RefreshToken: "",
-		User: &UserInfo{
-			ID:    user.ID,
-			Email: user.Email,
-			Role:  user.Role,
-		},
-	}, errors.New("TWO_FA_REQUIRED:" + twoFAToken)
+	return nil, errors.New("TWO_FA_REQUIRED:" + twoFAToken)
 }
 
 
@@ -133,9 +134,21 @@ func (s *AuthService) Login(
 		return nil, err
 	}
 
-	// 🕒 Update last login ONLY after success
-	now := time.Now()
+now := time.Now()
+
+if user.LastLoginAt == nil {
 	_ = s.repo.UpdateLastLogin(user.ID, &now)
+	_ = s.repo.Enable2FA(user.ID)
+
+	// 🔥 RELOAD USER FROM DB
+	user, _ = s.repo.FindUserByID(user.ID)
+}
+
+log.Println("2FA enabled:", user.TwoFAEnabled)
+log.Println("Last login:", user.LastLoginAt)
+
+
+
 
 	return &LoginResponse{
 		AccessToken:  accessToken,
@@ -349,6 +362,7 @@ func (s *AuthService) ResetPassword(
 
 
 func (s *AuthService) CreateUser(
+	name string,
 	email string,
 	role models.Role,
 	createdBy uuid.UUID,
@@ -373,6 +387,7 @@ func (s *AuthService) CreateUser(
 	}
 
 	user := &models.User{
+		Name:              name,
 		Email:             email,
 		Password:          hashed,
 		Role:              role,
@@ -453,7 +468,11 @@ func (s *AuthService) SendPasswordResetEmail(email string) error {
 }
 func (s *AuthService) sendOTP(user *models.User) error {
 
-	code := fmt.Sprintf("%06d", rand.Intn(1000000))
+	code, err := generateOTP()
+	if err != nil {
+		return err
+	}
+
 	hashed := utils.HashToken(code)
 
 	_ = s.repo.MarkAllOTPUsed(user.ID)
@@ -476,9 +495,12 @@ func (s *AuthService) sendOTP(user *models.User) error {
 
 	return s.mailer.Send(user.Email, "Your login code", body)
 }
-func (s *AuthService) Verify2FA(userID uuid.UUID, code string) (*LoginResponse, error) {
 
-	// 🔐 HASH OTP (enterprise-grade)
+func (s *AuthService) Verify2FA(
+	userID uuid.UUID,
+	code string,
+) (*LoginResponse, error) {
+
 	hashed := utils.HashToken(code)
 
 	otp, err := s.repo.FindValid2FAOTP(userID, hashed)
@@ -486,7 +508,6 @@ func (s *AuthService) Verify2FA(userID uuid.UUID, code string) (*LoginResponse, 
 		return nil, errors.New("invalid or expired otp")
 	}
 
-	// ✅ Mark OTP as used
 	_ = s.repo.MarkOTPUsed(otp.ID)
 
 	user, err := s.repo.FindUserByID(userID)
@@ -499,6 +520,7 @@ func (s *AuthService) Verify2FA(userID uuid.UUID, code string) (*LoginResponse, 
 
 	return s.issueTokens(user)
 }
+
 
 func (s *AuthService) issueTokens(user *models.User) (*LoginResponse, error) {
 
@@ -546,3 +568,45 @@ func (s *AuthService) Disable2FA(userID uuid.UUID) error {
 	return s.repo.Disable2FA(userID)
 } 
 
+
+
+func generateOTP() (string, error) {
+	n, err := rand.Int(rand.Reader, big.NewInt(1000000))
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%06d", n.Int64()), nil
+}
+
+/* =====================
+   Admin: Get Users (Paginated)
+===================== */
+
+func (s *AuthService) GetUsersPaginated(page int) ([]*GetuserInfo, int64, error) {
+	const pageSize = 3
+
+	if page < 1 {
+		page = 1
+	}
+
+	offset := (page - 1) * pageSize
+
+	users, total, err := s.repo.GetUsersPaginated(pageSize, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	result := make([]*GetuserInfo, 0, len(users))
+	for _, u := range users {
+		result = append(result, &GetuserInfo{
+			ID:    u.ID,
+			Name:  u.Name,
+			Email: u.Email,
+			Role:  u.Role,
+			CreatedAt: u.CreatedAt,
+			IsActive: u.IsActive,
+		})
+	}
+
+	return result, total, nil
+}

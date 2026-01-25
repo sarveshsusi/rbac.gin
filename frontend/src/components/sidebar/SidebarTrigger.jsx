@@ -10,7 +10,7 @@ export function SidebarTrigger() {
       className="lg:hidden rounded-md border bg-white p-2"
       aria-label="Toggle sidebar"
     >
-      <Menu className="h-5 w-5" />
+      <Menu className="h-4 w-4" />
     </button>
   );
 }

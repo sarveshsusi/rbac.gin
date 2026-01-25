@@ -24,10 +24,11 @@ func SetupRoutes(
 		auth.POST("/reset-password", authHandler.ResetPassword)
 
 		auth.POST(
-			"/verify-2fa",
-			middleware.Temp2FAMiddleware(cfg),
-			authHandler.Verify2FA,
-		)
+	"/verify-2fa",
+	middleware.Temp2FAMiddleware(cfg),
+	authHandler.Verify2FA,
+)
+
 	}
 
 	protected := api.Group("")
@@ -44,6 +45,7 @@ func SetupRoutes(
 		admin.Use(middleware.RequireAdmin())
 		{
 			admin.POST("/users", authHandler.CreateUser)
+			admin.GET("/users", authHandler.GetAllUsers)
 		}
 	}
 }

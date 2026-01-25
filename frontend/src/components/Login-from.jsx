@@ -1,4 +1,3 @@
-
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { Eye, EyeOff } from "lucide-react"
@@ -7,7 +6,6 @@ import { cn } from "../lib/utils"
 import { Button } from "../components/ui/button"
 import {
   Field,
-  FieldDescription,
   FieldGroup,
   FieldLabel,
   FieldSeparator,
@@ -33,10 +31,26 @@ export function LoginForm({ className, ...props }) {
     setLoading(true)
 
     try {
-      await login(email.trim(), password)
+      const result = await login(email.trim(), password)
+
+      // 🔐 2FA REQUIRED → redirect
+      if (result.status === "2FA") {
+        sessionStorage.setItem("two_fa_token", result.token)
+        navigate("/verify-otp", { replace: true })
+        return
+      }
+
+      // ✅ NORMAL LOGIN
       navigate("/", { replace: true })
-    } catch {
-      setError("Invalid credentials")
+    } catch (err) {
+      if (
+        err.response?.status === 403 &&
+        err.response?.data?.error === "password_reset_required"
+      ) {
+        setError("You must reset your password before logging in.")
+      } else {
+        setError("Invalid email or password")
+      }
     } finally {
       setLoading(false)
     }
@@ -98,7 +112,7 @@ export function LoginForm({ className, ...props }) {
             <button
               type="button"
               aria-label="Toggle password visibility"
-              onClick={() => setShowPassword(!showPassword)}
+              onClick={() => setShowPassword((v) => !v)}
               className="absolute right-3 top-2.5 text-gray-500"
             >
               {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -111,17 +125,6 @@ export function LoginForm({ className, ...props }) {
         </Button>
 
         <FieldSeparator>Powered by Emerald</FieldSeparator>
-
-        {/* <Button variant="outline" type="button">
-          Powered by Emerald
-        </Button> */}
-
-        {/* <FieldDescription className="text-center">
-          Don&apos;t have an account?{" "}
-          <a href="/signup" className="underline">
-            Sign up
-          </a>
-        </FieldDescription> */}
       </FieldGroup>
     </form>
   )

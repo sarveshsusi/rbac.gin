@@ -16,18 +16,19 @@ const (
 
 type User struct {
 	ID                uuid.UUID  `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	Name              string     `gorm:"type:varchar(100);not null"` // ✅ NEW
+	Name              string    `gorm:"type:varchar(100)"` // 👈 pointer
 	Email             string     `gorm:"uniqueIndex;not null"`
 	Password          string     `gorm:"not null"`
 	Role              Role       `gorm:"type:varchar(20);not null"`
 	IsActive          bool       `gorm:"default:true"`
 	MustResetPassword bool       `gorm:"default:false"`
 	CreatedBy         *uuid.UUID `gorm:"type:uuid;index"`
-	TwoFAEnabled      bool       `gorm:"default:false"`
+	TwoFAEnabled      bool       `gorm:"column:two_fa_enabled;default:false"`
 	LastLoginAt       *time.Time
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
 }
+
 
 type RefreshToken struct {
 	ID        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`

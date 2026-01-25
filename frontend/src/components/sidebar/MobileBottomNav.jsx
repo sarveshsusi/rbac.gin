@@ -21,9 +21,9 @@ export default function MobileBottomNav() {
     <nav
       className="
         fixed bottom-0 left-0 right-0 z-50
-        bg-white border-t
+        bg-white border-t border-gray-200
         flex justify-around items-center
-        h-14
+        h-15 
         lg:hidden
       "
     >

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -10,7 +11,6 @@ import (
 	"rbac/config"
 	"rbac/models"
 	"rbac/service"
-	"rbac/utils"
 )
 
 type AuthHandler struct {
@@ -53,6 +53,7 @@ type RefreshRequest struct {
 }
 
 type CreateUserRequest struct {
+	Name  string      `json:"name" binding:"required"`	
 	Email string      `json:"email" binding:"required,email"`
 	Role  models.Role `json:"role" binding:"required,oneof=support customer"`
 }
@@ -204,6 +205,7 @@ func (h *AuthHandler) CreateUser(c *gin.Context) {
 	createdBy := c.MustGet("user_id").(uuid.UUID)
 
 	user, err := h.service.CreateUser(
+		req.Name,
 		req.Email,
 		req.Role,
 		createdBy,
@@ -213,7 +215,7 @@ func (h *AuthHandler) CreateUser(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
-	}
+	} 
 
 	c.JSON(http.StatusCreated, gin.H{
 		"id":      user.ID,
@@ -384,42 +386,93 @@ func (h *AuthHandler) Disable2FA(c *gin.Context) {
 		"message": "2FA disabled successfully",
 	})
 }
+// func (h *AuthHandler) Verify2FA(c *gin.Context) {
+
+// 	rawToken := c.GetHeader("X-2FA-Token")
+// 	if rawToken == "" {
+// 		c.JSON(401, gin.H{"error": "missing 2fa token"})
+// 		return
+// 	}
+
+// 	claims, err := utils.Parse2FAToken(
+// 		rawToken,
+// 		h.cfg.JWT.AccessSecret,
+// 	)
+// 	if err != nil {
+// 		c.JSON(401, gin.H{"error": "invalid 2fa session"})
+// 		return
+// 	}
+
+// 	var req VerifyOTPRequest
+// 	if err := c.ShouldBindJSON(&req); err != nil {
+// 		c.JSON(400, gin.H{"error": "invalid request"})
+// 		return
+// 	}
+
+// 	resp, err := h.service.Verify2FA(
+// 		claims.UserID,
+// 		req.Code,
+// 	)
+// 	if err != nil {
+// 		c.JSON(401, gin.H{"error": err.Error()})
+// 		return
+// 	}
+
+// 	h.setRefreshCookie(c, resp.RefreshToken)
+
+// 	c.JSON(200, gin.H{
+// 		"access_token": resp.AccessToken,
+// 		"user": resp.User,
+// 	})
+// }
+
 func (h *AuthHandler) Verify2FA(c *gin.Context) {
-
-	rawToken := c.GetHeader("X-2FA-Token")
-	if rawToken == "" {
-		c.JSON(401, gin.H{"error": "missing 2fa token"})
-		return
-	}
-
-	claims, err := utils.Parse2FAToken(
-		rawToken,
-		h.cfg.JWT.AccessSecret,
-	)
-	if err != nil {
-		c.JSON(401, gin.H{"error": "invalid 2fa session"})
-		return
-	}
+	userID := c.MustGet("2fa_user_id").(uuid.UUID)
 
 	var req VerifyOTPRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(400, gin.H{"error": "invalid request"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
 		return
 	}
 
-	resp, err := h.service.Verify2FA(
-		claims.UserID,
-		req.Code,
-	)
+	resp, err := h.service.Verify2FA(userID, req.Code)
 	if err != nil {
-		c.JSON(401, gin.H{"error": err.Error()})
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": err.Error(),
+		})
 		return
 	}
 
 	h.setRefreshCookie(c, resp.RefreshToken)
 
-	c.JSON(200, gin.H{
+	c.JSON(http.StatusOK, gin.H{
 		"access_token": resp.AccessToken,
-		"user": resp.User,
+		"user":         resp.User,
+	})
+}
+
+// Admin: Get Users (Paginated)
+func (h *AuthHandler) GetAllUsers(c *gin.Context) {
+	page := 1
+
+	if p := c.Query("page"); p != "" {
+		if parsed, err := strconv.Atoi(p); err == nil {
+			page = parsed
+		}
+	}
+
+	users, total, err := h.service.GetUsersPaginated(page)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "failed to fetch users",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"page":      page,
+		"page_size": 3,
+		"total":     total,
+		"users":     users,
 	})
 }

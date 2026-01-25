@@ -1,6 +1,8 @@
 import { useAuth } from "../auth/useAuth";
+import usePageTitle from "../components/hooks/usePageTitle";
 
 export default function Dashboard() {
+   usePageTitle("Dashboard • RBAC App");
   const { user, logout } = useAuth();
 
   return (

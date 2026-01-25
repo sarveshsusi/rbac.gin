@@ -221,3 +221,40 @@ func (r *AuthRepository) UpdateLastLogin(
 		Where("id = ?", userID).
 		Update("last_login_at", t).Error
 }
+
+/* =====================
+   Admin: Get Users (Paginated)
+===================== */
+
+func (r *AuthRepository) GetUsersPaginated(
+	limit int,
+	offset int,
+) ([]models.User, int64, error) {
+
+	var users []models.User
+	var total int64
+
+	// Count total active users
+	if err := r.db.
+		Model(&models.User{}).
+		Where("is_active = true").
+		Count(&total).
+		Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Fetch paginated users
+	err := r.db.
+		Where("is_active = true").
+		Order("created_at DESC").
+		Limit(limit).
+		Offset(offset).
+		Find(&users).
+		Error
+
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return users, total, nil
+}

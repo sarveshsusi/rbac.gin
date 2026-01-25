@@ -11,10 +11,11 @@ import {
 } from "../ui/sidebar";
 
 import { NavLink } from "react-router-dom";
-import { Menu, X, User, LogOut } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { useSidebar } from "./useSidebar";
 import { useAuth } from "../../auth/useAuth";
 import { SIDEBAR_ITEMS } from "../../config/sidebarConfig";
+import { SidebarProfile } from "./SidebarProfile";
 
 export default function Sidebar() {
   const { open, setOpen } = useSidebar();
@@ -28,23 +29,31 @@ export default function Sidebar() {
     item.roles.includes(role)
   );
 
+  const handleNavClick = () => {
+    if (window.innerWidth < 1024) {
+      setOpen(false);
+    }
+  };
+
   return (
     <>
       {/* ================= SIDEBAR ================= */}
       <RadixSidebar
         className={`
           fixed inset-y-0 left-0 z-50
-          flex flex-col h-screen          /* ✅ KEY FIX */
+          flex flex-col h-screen
           w-64 p-1
-          bg-gradient-to-b from-white to-slate-50
+          bg-linear-to-b from-white to-slate-50
           shadow-[4px_0_24px_rgba(0,0,0,0.06)]
           transition-all duration-300 ease-in-out
 
           /* MOBILE */
           ${open ? "translate-x-0" : "-translate-x-full"}
+          pb-[calc(env(safe-area-inset-bottom)+24px)]
 
           /* DESKTOP */
           lg:translate-x-0
+          lg:pb-0
           ${open ? "lg:w-64" : "lg:w-16"}
         `}
         onMouseEnter={() => {
@@ -61,7 +70,6 @@ export default function Sidebar() {
         {/* ================= HEADER ================= */}
         <SidebarHeader>
           <div className="relative flex h-14 items-center justify-between px-4">
-            {/* Brand */}
             <span
               className={`
                 text-sm font-semibold tracking-wide
@@ -72,7 +80,6 @@ export default function Sidebar() {
               RBAC App
             </span>
 
-            {/* Collapsed logo */}
             <span
               className={`
                 absolute left-4 text-sm font-semibold
@@ -83,12 +90,11 @@ export default function Sidebar() {
               R
             </span>
 
-            {/* Toggle */}
             <button
               onClick={() => setOpen(!open)}
-              className="rounded-md p-1.5 hover:bg-slate-100"
+              className="lg:hidden rounded-md hover:bg-slate-100"
             >
-              {open ? <X size={18} /> : <Menu size={16} />}
+              {open ? <X size={18} /> : <Menu size={15} />}
             </button>
           </div>
         </SidebarHeader>
@@ -102,10 +108,11 @@ export default function Sidebar() {
                   <SidebarMenuItem key={item.path}>
                     <NavLink
                       to={item.path}
+                      onClick={handleNavClick}
                       className={({ isActive }) =>
                         `
-                        group flex items-center gap-3
-                        rounded-xl px-3 py-2.5 text-sm
+                        group flex items-center gap-3 mb-2
+                        rounded-lg px-3 py-2.5 text-sm p-5
                         transition-all duration-200
                         ${
                           isActive
@@ -119,7 +126,7 @@ export default function Sidebar() {
 
                       <span
                         className={`
-                          whitespace-nowrap transition-all duration-200
+                          whitespace-nowrap transition-all duration-200 text-md
                           ${
                             open
                               ? "opacity-100 translate-x-0"
@@ -137,56 +144,19 @@ export default function Sidebar() {
           </SidebarGroup>
         </SidebarContent>
 
-        {/* ================= FOOTER (BOTTOM FIXED) ================= */}
-        <SidebarFooter className="mt-auto px-3 pb-3">
-          <div className="rounded-xl bg-slate-100 p-3 mt-2 space-y-3">
-            {/* Profile */}
-            <div className="flex items-center gap-3 mb-2">
-              <User className="h-5 w-5 text-slate-500" />
-
-              <div
-                className={`
-                  transition-all duration-200
-                  ${
-                    open
-                      ? "opacity-100 translate-x-0"
-                      : "opacity-0 -translate-x-2 pointer-events-none"
-                  }
-                `}
-              >
-                <p className="text-sm font-medium text-slate-700">
-                  {user.name}
-                </p>
-               
-                <p className="text-xs text-slate-500 capitalize">
-                  {user.email}
-                </p>
-                 <p className="text-xs text-slate-500 capitalize">
-                  {user.role}
-                </p>
-              </div>
-            </div>
-
-            {/* Logout */}
-            <button
-              onClick={logout}
-              className={`
-                flex justify-center items-center gap-2
-                w-full rounded-lg px-3 py-3
-                text-sm font-medium
-                text-red-600 hover:bg-red-100
-                transition-all
-                ${
-                  open
-                    ? "opacity-100"
-                    : "opacity-0 pointer-events-none"
-                }
-              `}
-            >
-              <LogOut size={16} />
-              Logout
-            </button>
-          </div>
+        {/* ================= FOOTER ================= */}
+        <SidebarFooter
+          className="
+            mt-auto px-3 pb-3
+            border-t border-slate-200/60
+            lg:border-none
+          "
+        >
+          <SidebarProfile
+            user={user}
+            logout={logout}
+            open={open}
+          />
         </SidebarFooter>
       </RadixSidebar>
 

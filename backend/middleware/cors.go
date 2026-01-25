@@ -16,17 +16,22 @@ func CORSMiddleware(allowedOrigins []string) gin.HandlerFunc {
 		origin := c.Request.Header.Get("Origin")
 
 		if origin != "" && originMap[origin] {
-			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
-			c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-			c.Writer.Header().Set("Access-Control-Allow-Headers",
-				"Authorization, Content-Type, X-Requested-With",
+			c.Header("Access-Control-Allow-Origin", origin)
+			c.Header("Access-Control-Allow-Credentials", "true")
+
+			// ✅ FIX: all headers in ONE string
+			c.Header(
+				"Access-Control-Allow-Headers",
+				"Authorization, Content-Type, X-Requested-With, X-2FA-Token",
 			)
-			c.Writer.Header().Set("Access-Control-Allow-Methods",
+
+			c.Header(
+				"Access-Control-Allow-Methods",
 				"GET, POST, PUT, PATCH, DELETE, OPTIONS",
 			)
 		}
 
-		// Handle preflight request
+		// ✅ Handle preflight
 		if c.Request.Method == http.MethodOptions {
 			c.AbortWithStatus(http.StatusNoContent)
 			return

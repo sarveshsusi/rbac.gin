@@ -4,11 +4,13 @@ import RequireAuth from "./auth/RequireAuth";
 import RequireGuest from "./auth/RequireGuest";
 
 import LoginPage from "./pages/Login-page";
-import ResetPassword from "./pages/ResetPassword"; // ✅ ADD
+import VerifyOTP from "./pages/VerifyOTP"; // ✅ ADD
+import ResetPassword from "./pages/ResetPassword";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+
 import Dashboard from "./pages/Dashboard";
 import AdminUsers from "./pages/AdminUsers";
 import AppLayout from "./layout/AppLayout";
-import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 
 function App() {
   const { loading } = useAuth();
@@ -28,6 +30,16 @@ function App() {
         }
       />
 
+      {/* ✅ 2FA OTP (GUEST ONLY) */}
+      <Route
+        path="/verify-otp"
+        element={
+          <RequireGuest>
+            <VerifyOTP />
+          </RequireGuest>
+        }
+      />
+
       {/* ✅ PASSWORD RESET (PUBLIC, NO GUARDS) */}
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -39,7 +51,12 @@ function App() {
         <Route element={<AppLayout />}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/admin/users" element={<AdminUsers />} />
-          <Route path="/customer/dashboard" element={<Dashboard />} />
+          
+        </Route>
+      </Route>
+       <Route element={<RequireAuth />}>
+        <Route element={<AppLayout />}>
+          <Route path="/customer/dashboard" element={<Dashboard />} />     
         </Route>
       </Route>
 

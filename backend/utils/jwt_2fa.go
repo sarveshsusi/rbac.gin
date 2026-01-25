@@ -12,15 +12,12 @@ type TwoFATokenClaims struct {
 	jwt.RegisteredClaims
 }
 
-func Generate2FAToken(
-	userID uuid.UUID,
-	secret string,
-) (string, error) {
-
+func Generate2FAToken(userID uuid.UUID, secret string) (string, error) {
 	claims := TwoFATokenClaims{
 		UserID: userID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(5 * time.Minute)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
 
@@ -28,11 +25,7 @@ func Generate2FAToken(
 	return token.SignedString([]byte(secret))
 }
 
-func Parse2FAToken(
-	raw string,
-	secret string,
-) (*TwoFATokenClaims, error) {
-
+func Parse2FAToken(raw string, secret string) (*TwoFATokenClaims, error) {
 	token, err := jwt.ParseWithClaims(
 		raw,
 		&TwoFATokenClaims{},

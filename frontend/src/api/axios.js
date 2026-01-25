@@ -53,9 +53,12 @@ api.interceptors.response.use(
   (res) => res,
   async (err) => {
     const original = err.config;
+    if (!accessToken) {
+  return Promise.reject(err);
+}
 
     // Ignore non-401 errors
-    if (err.response?.status !== 401) {
+    if (err.response?.status !== 401 || !accessToken) {
       return Promise.reject(err);
     }
 

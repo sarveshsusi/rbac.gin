@@ -51,11 +51,19 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const res = await loginApi({ email, password });
+    if (res.data?.two_fa_required) {
+    return {
+      two_fa_required: true,
+      two_fa_token: res.data.two_fa_token,
+    };
+  }
     setAccessToken(res.data.access_token);
     setUser(res.data.user);
 
     // 🔥 broadcast login
     authChannel.postMessage({ type: "LOGIN" });
+    return { success: true };
+    
   };
 
   const logout = async () => {

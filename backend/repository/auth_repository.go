@@ -36,10 +36,11 @@ func (r *AuthRepository) FindUserByEmail(email string) (*models.User, error) {
 	return &user, nil
 }
 
-func (r *AuthRepository) FindUserByID(userID uuid.UUID) (*models.User, error) {
+func (r *AuthRepository) FindUserByID(id uuid.UUID) (*models.User, error) {
 	var user models.User
+
 	err := r.db.
-		Where("id = ?", userID).
+		Where("id = ? AND is_active = true", id).
 		First(&user).
 		Error
 
@@ -62,8 +63,8 @@ func (r *AuthRepository) UpdateUserPassword(
 	return r.db.Model(&models.User{}).
 		Where("id = ?", userID).
 		Updates(map[string]interface{}{
-			"password":             hashedPassword,
-			"must_reset_password":  mustReset,
+			"password":            hashedPassword,
+			"must_reset_password": mustReset,
 		}).Error
 }
 
@@ -115,4 +116,108 @@ func (r *AuthRepository) RevokeRefreshToken(tokenHash string) error {
 	}
 
 	return nil
+}
+
+/* =====================
+   Password Reset
+===================== */
+
+func (r *AuthRepository) CreatePasswordReset(
+	reset *models.PasswordResetToken,
+) error {
+	return r.db.Create(reset).Error
+}
+
+func (r *AuthRepository) FindValidPasswordReset(
+	hashedToken string,
+) (*models.PasswordResetToken, error) {
+	var reset models.PasswordResetToken
+
+	err := r.db.
+		Where("token = ? AND used = false AND expires_at > NOW()", hashedToken).
+		First(&reset).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &reset, nil
+}
+
+func (r *AuthRepository) MarkPasswordResetUsed(id uuid.UUID) error {
+	return r.db.
+		Model(&models.PasswordResetToken{}).
+		Where("id = ?", id).
+		Update("used", true).
+		Error
+}
+
+/* =====================
+   2FA OTP
+===================== */
+
+func (r *AuthRepository) Create2FAOTP(otp *models.TwoFAOTP) error {
+	return r.db.Create(otp).Error
+}
+
+func (r *AuthRepository) FindValid2FAOTP(
+	userID uuid.UUID,
+	code string,
+) (*models.TwoFAOTP, error) {
+	var otp models.TwoFAOTP
+
+	err := r.db.Where(
+		"user_id = ? AND code = ? AND used = false AND expires_at > NOW()",
+		userID,
+		code,
+	).First(&otp).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &otp, nil
+}
+
+func (r *AuthRepository) MarkOTPUsed(id uuid.UUID) error {
+	return r.db.Model(&models.TwoFAOTP{}).
+		Where("id = ?", id).
+		Update("used", true).
+		Error
+}
+
+func (r *AuthRepository) MarkAllOTPUsed(userID uuid.UUID) error {
+	return r.db.Model(&models.TwoFAOTP{}).
+		Where("user_id = ? AND used = false", userID).
+		Update("used", true).
+		Error
+}
+
+/* =====================
+   2FA Settings
+===================== */
+
+func (r *AuthRepository) Enable2FA(userID uuid.UUID) error {
+	return r.db.Model(&models.User{}).
+		Where("id = ?", userID).
+		Update("two_fa_enabled", true).Error
+}
+
+func (r *AuthRepository) Disable2FA(userID uuid.UUID) error {
+	return r.db.Model(&models.User{}).
+		Where("id = ?", userID).
+		Update("two_fa_enabled", false).Error
+}
+
+/* =====================
+   Audit
+===================== */
+
+func (r *AuthRepository) UpdateLastLogin(
+	userID uuid.UUID,
+	t *time.Time,
+) error {
+	return r.db.Model(&models.User{}).
+		Where("id = ?", userID).
+		Update("last_login_at", t).Error
 }

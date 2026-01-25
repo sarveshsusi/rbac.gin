@@ -33,6 +33,9 @@ func main() {
 	if err := database.Init(cfg); err != nil {
 		log.Fatalf("❌ database init failed: %v", err)
 	}
+	log.Printf("MAIL HOST: %s", cfg.Mail.Host)
+log.Printf("MAIL USERNAME SET: %v", cfg.Mail.Username != "")
+
 
 	// Router
 	r := gin.New()

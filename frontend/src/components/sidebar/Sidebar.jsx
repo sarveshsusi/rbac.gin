@@ -139,7 +139,7 @@ export default function Sidebar() {
 
         {/* ================= FOOTER (BOTTOM FIXED) ================= */}
         <SidebarFooter className="mt-auto px-3 pb-3">
-          <div className="rounded-xl bg-slate-100 p-3 mt-2 space-y-3 bg-red-600">
+          <div className="rounded-xl bg-slate-100 p-3 mt-2 space-y-3">
             {/* Profile */}
             <div className="flex items-center gap-3 mb-2">
               <User className="h-5 w-5 text-slate-500" />
@@ -155,9 +155,13 @@ export default function Sidebar() {
                 `}
               >
                 <p className="text-sm font-medium text-slate-700">
+                  {user.name}
+                </p>
+               
+                <p className="text-xs text-slate-500 capitalize">
                   {user.email}
                 </p>
-                <p className="text-xs text-slate-500 capitalize">
+                 <p className="text-xs text-slate-500 capitalize">
                   {user.role}
                 </p>
               </div>

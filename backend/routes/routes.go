@@ -2,6 +2,7 @@ package routes
 
 import (
 	"github.com/gin-gonic/gin"
+
 	"rbac/config"
 	"rbac/handler"
 	"rbac/middleware"
@@ -14,18 +15,21 @@ func SetupRoutes(
 ) {
 	api := r.Group("/api/v1")
 
-	// ======================
-	// Public Auth Routes
-	// ======================
 	auth := api.Group("/auth")
 	{
 		auth.POST("/login", authHandler.Login)
 		auth.POST("/refresh", authHandler.RefreshToken)
+
+		auth.POST("/forgot-password", authHandler.ForgotPassword)
+		auth.POST("/reset-password", authHandler.ResetPassword)
+
+		auth.POST(
+			"/verify-2fa",
+			middleware.Temp2FAMiddleware(cfg),
+			authHandler.Verify2FA,
+		)
 	}
 
-	// ======================
-	// Protected Routes
-	// ======================
 	protected := api.Group("")
 	protected.Use(middleware.AuthMiddleware(cfg))
 	{
@@ -33,9 +37,9 @@ func SetupRoutes(
 		protected.GET("/profile", authHandler.GetMe)
 		protected.POST("/change-password", authHandler.ChangePassword)
 
-		// ======================
-		// Admin Routes
-		// ======================
+		protected.POST("/2fa/enable", authHandler.Enable2FA)
+		protected.POST("/2fa/disable", authHandler.Disable2FA)
+
 		admin := protected.Group("/admin")
 		admin.Use(middleware.RequireAdmin())
 		{

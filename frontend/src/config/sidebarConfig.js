@@ -14,7 +14,13 @@ export const SIDEBAR_ITEMS = [
     label: "Dashboard",
     path: "/dashboard",
     icon: Home,
-    roles: ["admin", "user", "support"],
+    roles: ["admin",  "support"],
+  },
+  {
+    label: "Dashboard",
+    path: "/customer/dashboard",
+    icon: Home,
+    roles: [ "customer"],
   },
 
   // ===== Admin =====

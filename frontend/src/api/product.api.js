@@ -3,11 +3,13 @@ import api from "./axios";
 /* =========================
    ADMIN
 ========================= */
+
 export const createProduct = (data) =>
   api.post("/admin/products", data);
 
 export const getProducts = () =>
   api.get("/admin/products");
+
 
 /* =========================
    CUSTOMER

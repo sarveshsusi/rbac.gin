@@ -1,11 +1,15 @@
 import { useEffect, useState } from "react";
-import api from "../api/axios";
+import {
+  getCategories,
+  createCategory,
+  getBrandsByCategory,
+  createBrand,
+  getModelsByBrand,
+  createModel,
+} from "../api/adminLookup.api";
 import { createProduct } from "../api/product.api";
 
 export default function AdminCreateProductAllInOne() {
-  /* =========================
-     STATE
-  ========================= */
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
   const [models, setModels] = useState([]);
@@ -21,216 +25,176 @@ export default function AdminCreateProductAllInOne() {
   const [productName, setProductName] = useState("");
   const [loading, setLoading] = useState(false);
 
-  /* =========================
-     LOAD CATEGORIES
-  ========================= */
+  /* LOAD CATEGORIES */
   useEffect(() => {
-    api.get("/categories").then((res) => {
-      setCategories(res.data || []);
-    });
+    getCategories()
+      .then((res) => setCategories(res.data || []))
+      .catch(() => setCategories([]));
   }, []);
 
-  /* =========================
-     LOAD BRANDS (CATEGORY)
-  ========================= */
+  /* LOAD BRANDS */
   useEffect(() => {
-    if (!categoryId) return;
+    if (!categoryId) {
+      setBrands([]);
+      setBrandId("");
+      return;
+    }
 
-    api
-      .get(`/categories/${categoryId}/brands`)
-      .then((res) => setBrands(res.data || []));
+    getBrandsByCategory(categoryId)
+      .then((res) => setBrands(res.data || []))
+      .catch(() => setBrands([]));
   }, [categoryId]);
 
-  /* =========================
-     LOAD MODELS (BRAND)
-  ========================= */
+  /* LOAD MODELS */
   useEffect(() => {
-    if (!brandId) return;
+    if (!brandId) {
+      setModels([]);
+      setModelId("");
+      return;
+    }
 
-    api
-      .get(`/brands/${brandId}/models`)
-      .then((res) => setModels(res.data || []));
+    getModelsByBrand(brandId)
+      .then((res) => setModels(res.data || []))
+      .catch(() => setModels([]));
   }, [brandId]);
 
-  /* =========================
-     CREATE LOOKUPS INLINE
-  ========================= */
-  const createCategory = async () => {
+  /* CREATE CATEGORY */
+  const addCategory = async () => {
     if (!newCategory.trim()) return;
-    const res = await api.post("/categories", { name: newCategory });
-    setCategories([...categories, res.data]);
+
+    const res = await createCategory(newCategory.trim());
+    setCategories((prev) => [...prev, res.data]);
     setCategoryId(res.data.id);
     setNewCategory("");
   };
 
-  const createBrand = async () => {
+  /* CREATE BRAND */
+  const addBrand = async () => {
     if (!newBrand.trim() || !categoryId) return;
-    const res = await api.post("/brands", {
-      name: newBrand,
-      category_id: categoryId,
-    });
-    setBrands([...brands, res.data]);
+
+    const res = await createBrand(newBrand.trim(), categoryId);
+    setBrands((prev) => [...prev, res.data]);
     setBrandId(res.data.id);
     setNewBrand("");
   };
 
-  const createModel = async () => {
+  /* CREATE MODEL */
+  const addModel = async () => {
     if (!newModel.trim() || !brandId) return;
-    const res = await api.post("/models", {
-      name: newModel,
-      brand_id: brandId,
-    });
-    setModels([...models, res.data]);
+
+    const res = await createModel(newModel.trim(), brandId);
+    setModels((prev) => [...prev, res.data]);
     setModelId(res.data.id);
     setNewModel("");
   };
 
-  /* =========================
-     CREATE PRODUCT
-  ========================= */
+  /* CREATE PRODUCT */
   const submit = async (e) => {
     e.preventDefault();
 
     if (!categoryId || !brandId || !modelId || !productName.trim()) {
-      alert("Please complete all steps");
+      alert("Complete all steps");
       return;
     }
 
     setLoading(true);
     try {
       await createProduct({
-        name: productName,
+        name: productName.trim(),
         category_id: categoryId,
         brand_id: brandId,
         model_id: modelId,
       });
 
       alert("Product created successfully");
-
-      // reset only product name
       setProductName("");
-    } catch (err) {
-      alert(err.response?.data?.error || "Failed to create product");
     } finally {
       setLoading(false);
     }
   };
 
-  /* =========================
-     UI
-  ========================= */
   return (
     <form
       onSubmit={submit}
       className="bg-white p-6 rounded-xl shadow max-w-xl space-y-4"
     >
-      <h1 className="text-2xl font-semibold">
-        Create Product (All-in-One)
-      </h1>
+      <h1 className="text-2xl font-semibold">Create Product (All in One)</h1>
 
       {/* CATEGORY */}
-      <div>
-        <select
-          className="w-full border rounded px-3 py-2"
-          value={categoryId}
-          onChange={(e) => setCategoryId(e.target.value)}
-        >
-          <option value="">Select Category</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
+      <select
+        className="w-full border rounded px-3 py-2"
+        value={categoryId}
+        onChange={(e) => setCategoryId(e.target.value)}
+      >
+        <option value="">Select Category</option>
+        {categories.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.name}
+          </option>
+        ))}
+      </select>
 
-        <div className="flex gap-2 mt-2">
-          <input
-            className="border rounded px-3 py-1 flex-1"
-            placeholder="Add new category"
-            value={newCategory}
-            onChange={(e) => setNewCategory(e.target.value)}
-          />
-          <button
-            type="button"
-            onClick={createCategory}
-            className="px-3 py-1 bg-gray-100 rounded"
-          >
-            + Add
-          </button>
-        </div>
-      </div>
+      <input
+        className="border px-3 py-2 rounded"
+        placeholder="New category"
+        value={newCategory}
+        onChange={(e) => setNewCategory(e.target.value)}
+      />
+      <button type="button" onClick={addCategory}>+ Add Category</button>
 
       {/* BRAND */}
-      <div>
-        <select
-          className="w-full border rounded px-3 py-2"
-          value={brandId}
-          onChange={(e) => setBrandId(e.target.value)}
-          disabled={!categoryId}
-        >
-          <option value="">Select Brand</option>
-          {brands.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name}
-            </option>
-          ))}
-        </select>
+      <select
+        className="w-full border rounded px-3 py-2"
+        value={brandId}
+        onChange={(e) => setBrandId(e.target.value)}
+        disabled={!categoryId}
+      >
+        <option value="">Select Brand</option>
+        {brands.map((b) => (
+          <option key={b.id} value={b.id}>
+            {b.name}
+          </option>
+        ))}
+      </select>
 
-        <div className="flex gap-2 mt-2">
-          <input
-            className="border rounded px-3 py-1 flex-1"
-            placeholder="Add new brand"
-            value={newBrand}
-            onChange={(e) => setNewBrand(e.target.value)}
-            disabled={!categoryId}
-          />
-          <button
-            type="button"
-            onClick={createBrand}
-            className="px-3 py-1 bg-gray-100 rounded"
-            disabled={!categoryId}
-          >
-            + Add
-          </button>
-        </div>
-      </div>
+      <input
+        className="border px-3 py-2 rounded"
+        placeholder="New brand"
+        value={newBrand}
+        onChange={(e) => setNewBrand(e.target.value)}
+        disabled={!categoryId}
+      />
+      <button type="button" onClick={addBrand} disabled={!categoryId}>
+        + Add Brand
+      </button>
 
       {/* MODEL */}
-      <div>
-        <select
-          className="w-full border rounded px-3 py-2"
-          value={modelId}
-          onChange={(e) => setModelId(e.target.value)}
-          disabled={!brandId}
-        >
-          <option value="">Select Model</option>
-          {models.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </select>
+      <select
+        className="w-full border rounded px-3 py-2"
+        value={modelId}
+        onChange={(e) => setModelId(e.target.value)}
+        disabled={!brandId}
+      >
+        <option value="">Select Model</option>
+        {models.map((m) => (
+          <option key={m.id} value={m.id}>
+            {m.name}
+          </option>
+        ))}
+      </select>
 
-        <div className="flex gap-2 mt-2">
-          <input
-            className="border rounded px-3 py-1 flex-1"
-            placeholder="Add new model"
-            value={newModel}
-            onChange={(e) => setNewModel(e.target.value)}
-            disabled={!brandId}
-          />
-          <button
-            type="button"
-            onClick={createModel}
-            className="px-3 py-1 bg-gray-100 rounded"
-            disabled={!brandId}
-          >
-            + Add
-          </button>
-        </div>
-      </div>
+      <input
+        className="border px-3 py-2 rounded"
+        placeholder="New model"
+        value={newModel}
+        onChange={(e) => setNewModel(e.target.value)}
+        disabled={!brandId}
+      />
+      <button type="button" onClick={addModel} disabled={!brandId}>
+        + Add Model
+      </button>
 
-      {/* PRODUCT NAME */}
+      {/* PRODUCT */}
       <input
         className="w-full border rounded px-3 py-2"
         placeholder="Product name"
@@ -241,7 +205,7 @@ export default function AdminCreateProductAllInOne() {
 
       <button
         disabled={loading}
-        className="bg-blue-600 text-white px-4 py-2 rounded w-full disabled:opacity-60"
+        className="bg-blue-600 text-white w-full py-2 rounded"
       >
         {loading ? "Creating..." : "Create Product"}
       </button>

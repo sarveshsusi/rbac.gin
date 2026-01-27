@@ -20,6 +20,7 @@ import (
 type AuthService struct {
 	repo      *repository.AuthRepository
 	deviceRepo *repository.RememberedDeviceRepo
+	customerRepo *repository.CustomerRepository 
 	mailer    *utils.Mailer
 	cfg       *config.Config
 }
@@ -27,11 +28,13 @@ type AuthService struct {
 func NewAuthService(
 	repo *repository.AuthRepository,
 	deviceRepo *repository.RememberedDeviceRepo,
+	customerRepo *repository.CustomerRepository,
 	cfg *config.Config,
 ) *AuthService {
 	return &AuthService{
 		repo:      repo,
 		deviceRepo: deviceRepo,
+		customerRepo: customerRepo, 
 		mailer:    utils.NewMailer(cfg.Mail),
 		cfg:       cfg,
 	}
@@ -415,6 +418,11 @@ func (s *AuthService) CreateUser(
 
 	if err := s.repo.CreateUser(user); err != nil {
 		return nil, err
+	}
+	if role == models.RoleCustomer {
+		if err := s.customerRepo.Create(user.ID); err != nil {
+			return nil, err
+		}
 	}
 
 	// 🔑 Create reset token

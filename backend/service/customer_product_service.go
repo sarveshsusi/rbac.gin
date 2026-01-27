@@ -18,18 +18,33 @@ func NewCustomerProductService(
 	return &CustomerProductService{repo: repo}
 }
 
+// func (s *CustomerProductService) AssignProductToCustomer(
+// 	customerID, productID uuid.UUID,
+// ) error {
+
+// 	exists, err := s.repo.Exists(customerID, productID)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	if exists {
+// 		return errors.New("product already assigned to customer")
+// 	}
+
+// 	return s.repo.Assign(customerID, productID)
+// }
+
 func (s *CustomerProductService) AssignProductToCustomer(
-	customerID, productID uuid.UUID,
+	userID uuid.UUID,
+	productID uuid.UUID,
 ) error {
 
-	exists, err := s.repo.Exists(customerID, productID)
+	// 🔥 STEP 1: find customer by user_id
+	customer, err := s.repo.GetCustomerByUserID(userID)
 	if err != nil {
-		return err
+		return errors.New("customer profile not found")
 	}
 
-	if exists {
-		return errors.New("product already assigned to customer")
-	}
-
-	return s.repo.Assign(customerID, productID)
+	// 🔥 STEP 2: assign product using customer.id
+	return s.repo.Assign(customer.ID, productID)
 }

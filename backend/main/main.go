@@ -63,6 +63,8 @@ func main() {
 	productRepo := repository.NewProductRepository(database.DB)
 	customerProductRepo := repository.NewCustomerProductRepository(database.DB)
 	feedbackRepo := repository.NewFeedbackRepository(database.DB)
+	customerRepo := repository.NewCustomerRepository(database.DB)
+
 
 	categoryRepo := repository.NewCategoryRepository(database.DB)
 	brandRepo := repository.NewBrandRepository(database.DB)
@@ -74,6 +76,7 @@ func main() {
 	authService := service.NewAuthService(
 		authRepo,
 		rememberedDeviceRepo,
+		customerRepo, 
 		cfg,
 	)
 

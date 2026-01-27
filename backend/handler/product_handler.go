@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	"rbac/middleware"
 	"rbac/models"
 	"rbac/service"
 )
@@ -24,30 +25,27 @@ func NewProductHandler(service *service.ProductService) *ProductHandler {
 func (h *ProductHandler) Create(c *gin.Context) {
 	var req models.CreateProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": err.Error(),
-		})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	adminID, err := uuid.Parse(c.GetString("user_id"))
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"error": "invalid admin user",
-		})
+	userIDValue, exists := c.Get(middleware.CtxUserID)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
+
+	adminID := userIDValue.(uuid.UUID)
 
 	product, err := h.service.CreateProduct(&req, adminID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": err.Error(),
-		})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusCreated, product)
 }
+
 
 /* =========================
    GET ALL PRODUCTS (ADMIN)

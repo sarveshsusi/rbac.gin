@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type CustomerProductRepository struct {
@@ -32,15 +33,36 @@ func (r *CustomerProductRepository) Exists(
 	return count > 0, err
 }
 
+
+
+func (r *CustomerProductRepository) GetCustomerByUserID(
+	userID uuid.UUID,
+) (*models.Customer, error) {
+
+	var customer models.Customer
+	err := r.db.
+		Where("user_id = ?", userID).
+		First(&customer).Error
+
+	return &customer, err
+}
+
 func (r *CustomerProductRepository) Assign(
-	customerID, productID uuid.UUID,
+	customerID uuid.UUID,
+	productID uuid.UUID,
 ) error {
 
-	cp := models.CustomerProduct{
-		CustomerID: customerID,
-		ProductID:  productID,
-		IsActive:   true,
-	}
-
-	return r.db.Create(&cp).Error
+	return r.db.
+		Clauses(clause.OnConflict{
+			Columns: []clause.Column{
+				{Name: "customer_id"},
+				{Name: "product_id"},
+			},
+			DoNothing: true,
+		}).
+		Create(&models.CustomerProduct{
+			CustomerID: customerID,
+			ProductID:  productID,
+		}).Error
 }
+

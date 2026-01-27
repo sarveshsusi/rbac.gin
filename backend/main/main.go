@@ -16,51 +16,130 @@ import (
 )
 
 func main() {
-	// Load .env (Supabase / local dev)
+	/* =========================
+	   ENV & CONFIG
+	========================= */
 	if err := godotenv.Load(); err != nil {
 		log.Println("⚠️  No .env file found, relying on system env vars")
 	}
 
-	// Load config
 	cfg := config.LoadConfig()
 
-	// Gin mode
 	if cfg.Server.Env == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	// Init DB
+	/* =========================
+	   DATABASE
+	========================= */
 	if err := database.Init(cfg); err != nil {
 		log.Fatalf("❌ database init failed: %v", err)
 	}
-	log.Printf("MAIL HOST: %s", cfg.Mail.Host)
-log.Printf("MAIL USERNAME SET: %v", cfg.Mail.Username != "")
 
-
-	// Router
+	/* =========================
+	   GIN ENGINE
+	========================= */
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
 
-	// ✅ Fix proxy warning
 	if err := r.SetTrustedProxies(nil); err != nil {
 		log.Fatalf("failed to set trusted proxies: %v", err)
 	}
 
-	// ✅ CORS (VERY IMPORTANT for frontend)
 	r.Use(middleware.CORSMiddleware([]string{
-		"http://localhost:5173", // Vite
+		"http://localhost:5173",
 		"http://localhost:3000",
-		// add prod domain later
 	}))
 
-	// Dependency injection
-	repo := repository.NewAuthRepository(database.DB)
-	svc := service.NewAuthService(repo, cfg)
-	authHandler := handler.NewAuthHandler(svc, cfg)
+	/* =========================
+	   REPOSITORIES
+	========================= */
+	authRepo := repository.NewAuthRepository(database.DB)
+	rememberedDeviceRepo := repository.NewRememberedDeviceRepo(database.DB)
 
-	// Routes
-	routes.SetupRoutes(r, authHandler, cfg)
+	dashboardRepo := repository.NewDashboardRepository(database.DB)
+	ticketRepo := repository.NewTicketRepository(database.DB)
+	amcRepo := repository.NewAMCRepository(database.DB)
+	productRepo := repository.NewProductRepository(database.DB)
+	customerProductRepo := repository.NewCustomerProductRepository(database.DB)
+	feedbackRepo := repository.NewFeedbackRepository(database.DB)
 
+	categoryRepo := repository.NewCategoryRepository(database.DB)
+	brandRepo := repository.NewBrandRepository(database.DB)
+	modelRepo := repository.NewModelRepository(database.DB)
+
+	/* =========================
+	   SERVICES
+	========================= */
+	authService := service.NewAuthService(
+		authRepo,
+		rememberedDeviceRepo,
+		cfg,
+	)
+
+	adminService := service.NewAdminService(dashboardRepo)
+	supportService := service.NewSupportService(ticketRepo)
+	customerService := service.NewCustomerService(ticketRepo)
+	ticketService := service.NewTicketService(ticketRepo)
+	amcService := service.NewAMCService(amcRepo)
+	productService := service.NewProductService(productRepo)
+	customerProductService := service.NewCustomerProductService(customerProductRepo)
+	feedbackService := service.NewFeedbackService(feedbackRepo)
+
+	categoryService := service.NewCategoryService(categoryRepo)
+	brandService := service.NewBrandService(brandRepo)
+	modelService := service.NewModelService(modelRepo)
+
+	/* =========================
+	   HANDLERS
+	========================= */
+	authHandler := handler.NewAuthHandler(authService, cfg)
+
+	adminDashboard := handler.NewAdminDashboardHandler(adminService)
+	supportDashboard := handler.NewSupportDashboardHandler(supportService)
+	customerDashboard := handler.NewCustomerDashboardHandler(customerService)
+
+	ticketHandler := handler.NewTicketHandler(ticketService)
+	amcHandler := handler.NewAMCHandler(amcService)
+	productHandler := handler.NewProductHandler(productService)
+	customerProductHandler := handler.NewCustomerProductHandler(customerProductService)
+	feedbackHandler := handler.NewFeedbackHandler(feedbackService)
+
+	categoryHandler := handler.NewCategoryHandler(categoryService)
+	brandHandler := handler.NewBrandHandler(brandService)
+	modelHandler := handler.NewModelHandler(modelService)
+
+	/* =========================
+	   ROUTES
+	========================= */
+	routes.SetupRoutes(
+		r,
+		cfg,
+
+		// Auth
+		authHandler,
+
+		// Dashboards
+		adminDashboard,
+		supportDashboard,
+		customerDashboard,
+
+		// Core
+		ticketHandler,
+		amcHandler,
+		productHandler,
+		customerProductHandler,
+		feedbackHandler,
+
+		// Lookups (NEW)
+		categoryHandler,
+		brandHandler,
+		modelHandler,
+	)
+
+	/* =========================
+	   START SERVER
+	========================= */
 	log.Printf(
 		"🚀 Server running on port %s [%s]",
 		cfg.Server.Port,

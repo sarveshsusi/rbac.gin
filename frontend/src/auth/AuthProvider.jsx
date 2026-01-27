@@ -56,8 +56,13 @@ export function AuthProvider({ children }) {
   }, []);
 
   // 🔐 LOGIN
-  const login = async (email, password) => {
-  const res = await loginApi({ email, password });
+// 🔐 LOGIN
+const login = async (email, password, rememberDevice = false) => {
+  const res = await loginApi({
+    email,
+    password,
+    rememberDevice, // 👈 ADD THIS
+  });
 
   // 🔐 2FA REQUIRED
   if (res.data?.two_fa_required) {
@@ -76,6 +81,7 @@ export function AuthProvider({ children }) {
     status: "OK",
   };
 };
+
 
 
   // 🔐 VERIFY 2FA

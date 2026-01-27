@@ -258,3 +258,37 @@ func (r *AuthRepository) GetUsersPaginated(
 
 	return users, total, nil
 }
+
+
+func (r *AuthRepository) CreateRememberedDevice(rd *models.RememberedDevice) error {
+	return r.db.Create(rd).Error
+}
+
+func (r *AuthRepository) FindValidRememberedDevice(
+	userID uuid.UUID,
+	hashedToken string,
+) (*models.RememberedDevice, error) {
+
+	var rd models.RememberedDevice
+
+	err := r.db.Where(
+		"user_id = ? AND token = ? AND expires_at > NOW()",
+		userID,
+		hashedToken,
+	).First(&rd).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &rd, nil
+}
+
+func (r *AuthRepository) DeleteUserDevices(userID uuid.UUID) error {
+	return r.db.Where("user_id = ?", userID).
+		Delete(&models.RememberedDevice{}).Error
+}
+
+func (r *AuthRepository) ErrNotFound(err error) bool {
+	return errors.Is(err, gorm.ErrRecordNotFound)
+}

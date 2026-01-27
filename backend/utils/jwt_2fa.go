@@ -8,35 +8,50 @@ import (
 )
 
 type TwoFATokenClaims struct {
-	UserID uuid.UUID `json:"user_id"`
+	UserID   uuid.UUID `json:"user_id"`
+	Remember bool      `json:"remember"`
 	jwt.RegisteredClaims
 }
 
-func Generate2FAToken(userID uuid.UUID, secret string) (string, error) {
+func Generate2FAToken(
+	userID uuid.UUID,
+	remember bool,
+	secret string,
+) (string, error) {
+
 	claims := TwoFATokenClaims{
-		UserID: userID,
+		UserID:   userID,
+		Remember: remember,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(5 * time.Minute)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(secret))
+	return jwt.NewWithClaims(
+		jwt.SigningMethodHS256,
+		claims,
+	).SignedString([]byte(secret))
 }
 
-func Parse2FAToken(raw string, secret string) (*TwoFATokenClaims, error) {
+func Parse2FAToken(raw, secret string) (*TwoFATokenClaims, error) {
 	token, err := jwt.ParseWithClaims(
 		raw,
 		&TwoFATokenClaims{},
 		func(t *jwt.Token) (interface{}, error) {
 			return []byte(secret), nil
 		},
+		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Name}),
 	)
 
-	if err != nil || !token.Valid {
+	if err != nil {
 		return nil, err
 	}
 
-	return token.Claims.(*TwoFATokenClaims), nil
+	claims, ok := token.Claims.(*TwoFATokenClaims)
+	if !ok || !token.Valid {
+		return nil, jwt.ErrTokenInvalidClaims
+	}
+
+	return claims, nil
 }

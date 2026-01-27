@@ -30,6 +30,7 @@ func Temp2FAMiddleware(cfg *config.Config) gin.HandlerFunc {
 
 		// ✅ PASS USER ID TO HANDLER
 		c.Set("2fa_user_id", claims.UserID)
+		c.Set("2fa_remember", claims.Remember)
 		c.Next()
 	}
 }

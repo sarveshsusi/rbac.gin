@@ -10,43 +10,50 @@ function LayoutContent() {
   const location = useLocation();
 
   const pageTitleMap = {
-    "/admin/users": "Users",
-    "/dashboard": "Dashboard",
-  };
+  "/dashboard": "Dashboard",
+  "/customer/dashboard": "Dashboard",
 
-  const title = pageTitleMap[location.pathname] ?? "RBAC Portal";
+  "/admin/users": "Admin Users",
+  "/admin/products": "Products",
+  "/admin/amc": "AMC Contracts",
+  "/admin/assign-products": "Assign Products",
+
+  "/support/tickets": "My Tickets",
+
+  "/customer/tickets": "My Tickets",
+  "/customer/amc": "My AMC",
+
+  "/tickets/new": "Create Ticket",
+};
+
+
+  const title =
+    pageTitleMap[location.pathname] ?? "RBAC Portal";
 
   return (
     <div className="min-h-screen flex bg-[#F4F7FB]">
       {/* SIDEBAR */}
       <Sidebar />
 
-      {/* MAIN WRAPPER */}
+      {/* MAIN CONTENT */}
       <div
         className={`
           flex-1 flex flex-col min-h-screen
           transition-all duration-300 ease-in-out
-
           ${open ? "lg:ml-64" : "lg:ml-16"}
           ml-0
         `}
       >
-        {/* TOP HEADER */}
+        {/* TOPBAR */}
         <Topbar title={title} />
 
-        {/* PAGE CONTENT */}
-        <main
-          className="
-            flex-1
-            px-4 md:px-6 py-4
-            pb-24
-          "
-        >
+        {/* CONTENT */}
+        <main className="flex-1 px-4 md:px-6 py-4 pb-24">
           <Outlet />
         </main>
       </div>
 
-      {/* MOBILE BOTTOM NAV */}
+      {/* MOBILE NAV */}
       <MobileBottomNav />
     </div>
   );

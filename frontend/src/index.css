@@ -1,5 +1,23 @@
 @import "tailwindcss";
-.input {
+/* .input {
   @apply w-full rounded-xl border px-4 py-2 text-sm
   focus:outline-none focus:ring-2 focus:ring-blue-500;
+} */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+/* Enable horizontal swipe */
+.touch-pan-x {
+  touch-action: pan-x;
+}
+
+/* iOS safe area */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+

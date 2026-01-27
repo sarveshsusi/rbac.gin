@@ -6,20 +6,26 @@ import (
 	"github.com/google/uuid"
 )
 
+// models/amc_contract.go
+
 type AMCContract struct {
-	ID        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	CustomerID uuid.UUID
-	StartDate time.Time
-	EndDate   time.Time
-	Value     float64
-	Status    string // active, expired, renewed
-	CreatedAt time.Time
+	ID                uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	CustomerProductID uuid.UUID `gorm:"index"`
+	SLAHours          int
+	StartDate         time.Time
+	EndDate           time.Time
+	Status            string // active, expired
+	CreatedAt         time.Time
 }
+
 
 type AMCSchedule struct {
 	ID        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	AMCID     uuid.UUID
+	AMCID     uuid.UUID `gorm:"type:uuid;index"`
 	VisitDate time.Time
 	Completed bool
 	TicketID  *uuid.UUID
+
+	AMC AMCContract `gorm:"foreignKey:AMCID"`
 }
+

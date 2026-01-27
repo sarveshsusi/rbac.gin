@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -40,8 +41,9 @@ type Verify2FARequest struct {
 
 
 type LoginRequest struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required"`
+	Email         string `json:"email" binding:"required,email"`
+	Password      string `json:"password" binding:"required"`
+	RememberDevice bool   `json:"rememberDevice"`
 }
 
 type ResetPasswordRequest struct {
@@ -103,46 +105,60 @@ func (h *AuthHandler) clearRefreshCookie(c *gin.Context) {
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid request",
+		})
 		return
 	}
 
 	resp, err := h.service.Login(
+		c,
 		req.Email,
 		req.Password,
+		req.RememberDevice, // 👈 checkbox
 		c.ClientIP(),
 		c.GetHeader("User-Agent"),
 	)
-	if err != nil {
-		if strings.HasPrefix(err.Error(), "TWO_FA_REQUIRED:") {
+fmt.Println("RememberDevice:", req.RememberDevice)
+	// 🔐 2FA required
+	if err != nil && strings.HasPrefix(err.Error(), "TWO_FA_REQUIRED:") {
 		token := strings.TrimPrefix(err.Error(), "TWO_FA_REQUIRED:")
 
-		c.JSON(200, gin.H{
+		c.JSON(http.StatusOK, gin.H{
 			"two_fa_required": true,
-			"two_fa_token": token,
+			"two_fa_token":    token,
 		})
 		return
 	}
-	if err.Error() == "PASSWORD_RESET_REQUIRED" {
+
+	// 🔒 Password reset required
+	if err != nil && err.Error() == "PASSWORD_RESET_REQUIRED" {
 		c.JSON(http.StatusForbidden, gin.H{
 			"error": "password_reset_required",
 		})
 		return
 	}
 
-	c.JSON(http.StatusUnauthorized, gin.H{
-		"error": "invalid credentials",
-	})
-	return
-}
+	// ❌ Invalid credentials
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "invalid credentials",
+		})
+		return
+	}
 
+	// ✅ Normal login success
 	h.setRefreshCookie(c, resp.RefreshToken)
+
+	
+
 
 	c.JSON(http.StatusOK, gin.H{
 		"access_token": resp.AccessToken,
 		"user":         resp.User,
 	})
 }
+
 
 // Refresh token
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
@@ -428,19 +444,45 @@ func (h *AuthHandler) Disable2FA(c *gin.Context) {
 
 func (h *AuthHandler) Verify2FA(c *gin.Context) {
 	userID := c.MustGet("2fa_user_id").(uuid.UUID)
+	remember := c.MustGet("2fa_remember").(bool)
 
 	var req VerifyOTPRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid request",
+		})
 		return
 	}
 
-	resp, err := h.service.Verify2FA(userID, req.Code)
+	resp, rememberToken, err := h.service.Verify2FA(
+		userID,
+		req.Code,
+		remember,
+		c.ClientIP(),
+		c.GetHeader("User-Agent"),
+	)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"error": err.Error(),
 		})
 		return
+	}
+
+	// 🍪 Set remember-device cookie (ONLY if requested)
+	if rememberToken != nil {
+		c.SetCookie(
+			"remember_device",
+			*rememberToken,
+			30*24*3600,
+			"/",
+			"",
+			true, // Secure
+			true, // HttpOnly
+		)
+		c.Writer.Header().Add(
+			"Set-Cookie",
+			"remember_device="+*rememberToken+"; SameSite=Strict",
+		)
 	}
 
 	h.setRefreshCookie(c, resp.RefreshToken)

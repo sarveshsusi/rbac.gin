@@ -8,12 +8,14 @@ import (
 
 type TicketStatus string
 
+
 const (
-	TicketOpen       TicketStatus = "open"
-	TicketAssigned   TicketStatus = "assigned"
-	TicketInProgress TicketStatus = "in_progress"
-	TicketClosed     TicketStatus = "closed"
-	TicketReopened   TicketStatus = "reopened"
+	TicketCustomerCreated  TicketStatus = "customer_created"
+	TicketAdminReviewed    TicketStatus = "admin_reviewed"
+	TicketAssignedSupport  TicketStatus = "assigned_to_support"
+	TicketResolvedSupport  TicketStatus = "resolved_by_support"
+	TicketClosedByAdmin    TicketStatus = "closed_by_admin"
+	TicketFeedbackGiven    TicketStatus = "feedback_given"
 )
 
 type TicketPriority string
@@ -25,22 +27,25 @@ const (
 	PriorityCritical TicketPriority = "critical"
 )
 
+// models/ticket.go
+
 type Ticket struct {
 	ID          uuid.UUID       `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	CustomerID  uuid.UUID       `gorm:"type:uuid;index"`
+	ProductID   uuid.UUID       `gorm:"type:uuid;index"`
+	AMCId       uuid.UUID       `gorm:"type:uuid;index"`
 	Title       string          `gorm:"type:varchar(255);not null"`
 	Description string          `gorm:"type:text"`
-	Status      TicketStatus    `gorm:"type:varchar(30);index"`
+	Status      TicketStatus    `gorm:"type:varchar(50);index"`
 	Priority    TicketPriority  `gorm:"type:varchar(30);index"`
 	SLAHours    int
 	TargetAt    *time.Time
-	CreatedBy   uuid.UUID       `gorm:"type:uuid"`
 	ClosedAt    *time.Time
+	CreatedBy   uuid.UUID
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
-
-	Customer Customer `gorm:"foreignKey:CustomerID"`
 }
+
 
 type TicketAssignment struct {
 	ID              uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
@@ -75,10 +80,13 @@ type TicketAttachment struct {
 	CreatedAt  time.Time
 }
 
+
 type TicketFeedback struct {
 	ID        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	TicketID  uuid.UUID
-	Rating    int `gorm:"check:rating >= 1 AND rating <= 5"`
+	EngineerID uuid.UUID
+	Rating    int
 	Comment   string
 	CreatedAt time.Time
 }
+

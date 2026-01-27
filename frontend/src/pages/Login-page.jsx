@@ -9,7 +9,7 @@ export default function LoginPage() {
           <div className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-600 text-white">
             <GalleryVerticalEnd size={16} />
           </div>
-          ABC Corp
+            EMERD
         </div>
 
         <div className="flex flex-1 items-center justify-center">

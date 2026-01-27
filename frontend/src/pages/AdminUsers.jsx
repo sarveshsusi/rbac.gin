@@ -3,7 +3,7 @@ import CreateUserCard from "../components/Users/CreateUserCard";
 import UsersTable from "../components/Users/UsersTable";
 
 export default function AdminUsers() {
-   usePageTitle("Admin Users • RBAC App");
+   usePageTitle("Admin Users • EMERD");
   return (
     <div className="w-full lg:mx-auto lg:max-w-7xl">
       {/* <h1 className="mb-6 px-4 sm:px-6 lg:px-8 text-2xl font-semibold text-slate-900">

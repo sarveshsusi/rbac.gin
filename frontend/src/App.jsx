@@ -4,13 +4,30 @@ import RequireAuth from "./auth/RequireAuth";
 import RequireGuest from "./auth/RequireGuest";
 
 import LoginPage from "./pages/Login-page";
-import VerifyOTP from "./pages/VerifyOTP"; // ✅ ADD
+import VerifyOTP from "./pages/VerifyOTP";
 import ResetPassword from "./pages/ResetPassword";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 
 import Dashboard from "./pages/Dashboard";
 import AdminUsers from "./pages/AdminUsers";
 import AppLayout from "./layout/AppLayout";
+
+// ✅ ADMIN
+import AdminProducts from "./pages/AdminProducts";
+import AdminAMCs from "./pages/AdminAMCs";
+import AdminTicketAssignment from "./pages/AdminTicketAssignment";
+import AdminProductAssignment from "./pages/AdminProductAssignment";
+// ✅ SUPPORT
+import SupportTickets from "./pages/SupportTickets";
+
+// ✅ CUSTOMER
+import CustomerTickets from "./pages/CustomerTickets";
+import CustomerAMCs from "./pages/CustomerAMCs";
+
+// ✅ SHARED
+import CreateTicket from "./pages/CreateTicket";
+import TicketDetail from "./pages/TicketDetail";
+import AdminCreateProductAllInOne from "./pages/AdminCreateProductAllInOne";
 
 function App() {
   const { loading } = useAuth();
@@ -19,7 +36,7 @@ function App() {
   return (
     <Routes>
       {/* =====================
-          PUBLIC / GUEST ROUTES
+          PUBLIC / GUEST
       ====================== */}
       <Route
         path="/login"
@@ -30,7 +47,6 @@ function App() {
         }
       />
 
-      {/* ✅ 2FA OTP (GUEST ONLY) */}
       <Route
         path="/verify-otp"
         element={
@@ -40,23 +56,35 @@ function App() {
         }
       />
 
-      {/* ✅ PASSWORD RESET (PUBLIC, NO GUARDS) */}
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
       {/* =====================
-          PROTECTED ROUTES
+          PROTECTED (AUTH)
       ====================== */}
       <Route element={<RequireAuth />}>
         <Route element={<AppLayout />}>
+          {/* DASHBOARDS */}
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/customer/dashboard" element={<Dashboard />} />
+
+          {/* ADMIN */}
           <Route path="/admin/users" element={<AdminUsers />} />
-          
-        </Route>
-      </Route>
-       <Route element={<RequireAuth />}>
-        <Route element={<AppLayout />}>
-          <Route path="/customer/dashboard" element={<Dashboard />} />     
+          <Route path="/admin/products" element={<AdminCreateProductAllInOne />} />
+          <Route path="/admin/assign-products" element={<AdminProductAssignment />} />
+          <Route path="/admin/amc" element={<AdminAMCs />} />
+          <Route path="/admin/tickets" element={<AdminTicketAssignment />} />
+
+          {/* SUPPORT */}
+          <Route path="/support/tickets" element={<SupportTickets />} />
+
+          {/* CUSTOMER */}
+          <Route path="/customer/tickets" element={<CustomerTickets />} />
+          <Route path="/customer/amc" element={<CustomerAMCs />} />
+
+          {/* TICKETS (SHARED) */}
+          <Route path="/tickets/new" element={<CreateTicket />} />
+          <Route path="/tickets/:id" element={<TicketDetail />} />
         </Route>
       </Route>
 

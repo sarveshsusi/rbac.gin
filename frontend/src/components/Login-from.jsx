@@ -19,6 +19,7 @@ export function LoginForm({ className, ...props }) {
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [rememberDevice, setRememberDevice] = useState(false) // 👈 NEW
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
@@ -31,7 +32,14 @@ export function LoginForm({ className, ...props }) {
     setLoading(true)
 
     try {
-      const result = await login(email.trim(), password)
+      // 👇 PASS rememberDevice
+      const result = await login(
+        email.trim(),
+        password,
+        rememberDevice
+      )
+    
+
 
       // 🔐 2FA REQUIRED → redirect
       if (result.status === "2FA") {
@@ -119,6 +127,17 @@ export function LoginForm({ className, ...props }) {
             </button>
           </div>
         </Field>
+
+        {/* 👇 REMEMBER DEVICE CHECKBOX */}
+        <label className="flex items-center gap-2 text-sm text-gray-600">
+          <input
+            type="checkbox"
+            checked={rememberDevice}
+            onChange={(e) => setRememberDevice(e.target.checked)}
+            className="accent-blue-600"
+          />
+          Remember this device
+        </label>
 
         <Button type="submit" disabled={loading}>
           {loading ? "Signing in…" : "Login"}

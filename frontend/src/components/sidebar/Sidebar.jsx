@@ -18,6 +18,9 @@ import { SIDEBAR_ITEMS } from "../../config/sidebarConfig";
 import { SidebarProfile } from "./SidebarProfile";
 
 export default function Sidebar() {
+  const img1 = "https://ik.imagekit.io/cj2po8igx/EMERD/ChatGPT_Image_Jan_26__2026__09_32_12_PM-removebg-preview.png"
+  const img2 ="https://ik.imagekit.io/cj2po8igx/EMERD/ChatGPT_Image_Jan_26__2026__09_33_14_PM-removebg-preview.png"
+  
   const { open, setOpen } = useSidebar();
   const { user, logout } = useAuth();
   const hoverTimeout = useRef(null);
@@ -26,7 +29,7 @@ export default function Sidebar() {
 
   const role = user.role.toLowerCase();
   const allowedItems = SIDEBAR_ITEMS.filter((item) =>
-    item.roles.includes(role)
+    item.roles.includes(role),
   );
 
   const handleNavClick = () => {
@@ -41,9 +44,9 @@ export default function Sidebar() {
       <RadixSidebar
         className={`
           fixed inset-y-0 left-0 z-50
-          flex flex-col h-screen
+          flex flex-col h-screen 
           w-64 p-1
-          bg-linear-to-b from-white to-slate-50
+          bg-linear-to-b from-white to-white
           shadow-[4px_0_24px_rgba(0,0,0,0.06)]
           transition-all duration-300 ease-in-out
 
@@ -52,7 +55,7 @@ export default function Sidebar() {
           pb-[calc(env(safe-area-inset-bottom)+24px)]
 
           /* DESKTOP */
-          lg:translate-x-0
+          lg:translate-x-0 border-r border-slate-200
           lg:pb-0
           ${open ? "lg:w-64" : "lg:w-16"}
         `}
@@ -68,27 +71,34 @@ export default function Sidebar() {
         }}
       >
         {/* ================= HEADER ================= */}
-        <SidebarHeader>
+        <div className="border-b border-slate-200"> 
           <div className="relative flex h-14 items-center justify-between px-4">
             <span
               className={`
-                text-sm font-semibold tracking-wide
-                whitespace-nowrap transition-all duration-200
-                ${open ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-2"}
+                text-lg font-extrabold tracking-wide
+                whitespace-nowrap transition-all duration-200 
+
+                ${open ? "opacity-95 translate-x-0" : "opacity-0 -translate-x-2"}
               `}
             >
-              RBAC App
+              <img src={img1} alt="" className="" />
+              {/* <span className="text-blue-600 text-2xl">E</span>MERD */}
             </span>
 
-            <span
-              className={`
-                absolute left-4 text-sm font-semibold
-                transition-opacity duration-200
-                ${open ? "opacity-0" : "opacity-100"}
-              `}
-            >
-              R
-            </span>
+          <span
+  className={`
+    absolute left-4 text-lg font-semibold text-blue-600
+    transition-all duration-300 ease-out
+    will-change-transform will-change-opacity object-contain w-full h-full
+    ${open
+      ? "opacity-0 -translate-x-3 scale-110 blur-sm tracking-widest"
+      : "opacity-100 translate-x-0 scale-100 blur-0 tracking-normal"}
+  `}
+>
+  
+  <img src={img2} alt="" className=""/>
+</span>
+
 
             <button
               onClick={() => setOpen(!open)}
@@ -97,10 +107,10 @@ export default function Sidebar() {
               {open ? <X size={18} /> : <Menu size={15} />}
             </button>
           </div>
-        </SidebarHeader>
+        </div>
 
         {/* ================= MENU ================= */}
-        <SidebarContent className="flex-1 pt-2">
+        <SidebarContent className="border border-slate-200 flex-1 pt-2">
           <SidebarGroup>
             <SidebarGroupContent>
               <SidebarMenu className="space-y-1">
@@ -152,11 +162,7 @@ export default function Sidebar() {
             lg:border-none
           "
         >
-          <SidebarProfile
-            user={user}
-            logout={logout}
-            open={open}
-          />
+          <SidebarProfile user={user} logout={logout} open={open} />
         </SidebarFooter>
       </RadixSidebar>
 

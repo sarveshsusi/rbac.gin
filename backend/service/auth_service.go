@@ -1,11 +1,13 @@
 package service
 
 import (
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"log"
 	"time"
-"crypto/rand"
+
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
 	"math/big"
@@ -16,19 +18,22 @@ import (
 )
 
 type AuthService struct {
-	repo   *repository.AuthRepository
-	mailer *utils.Mailer
-	cfg    *config.Config
+	repo      *repository.AuthRepository
+	deviceRepo *repository.RememberedDeviceRepo
+	mailer    *utils.Mailer
+	cfg       *config.Config
 }
 
 func NewAuthService(
 	repo *repository.AuthRepository,
+	deviceRepo *repository.RememberedDeviceRepo,
 	cfg *config.Config,
 ) *AuthService {
 	return &AuthService{
-		repo:   repo,
-		mailer: utils.NewMailer(cfg.Mail),
-		cfg:    cfg,
+		repo:      repo,
+		deviceRepo: deviceRepo,
+		mailer:    utils.NewMailer(cfg.Mail),
+		cfg:       cfg,
 	}
 }
 
@@ -69,46 +74,61 @@ type GetuserInfo struct {
 */
 
 func (s *AuthService) Login(
+	c *gin.Context,
 	email string,
 	password string,
+	rememberDevice bool, // 👈 checkbox from login page
 	ip string,
 	userAgent string,
 ) (*LoginResponse, error) {
 
+	// 1️⃣ Find user
 	user, err := s.repo.FindUserByEmail(email)
 	if err != nil {
 		return nil, errors.New("invalid credentials")
 	}
 
+	// 2️⃣ Verify password
 	if err := utils.CheckPassword(password, user.Password); err != nil {
 		return nil, errors.New("invalid credentials")
 	}
 
-	// 🚫 Block login until password reset
+	// 3️⃣ Force password reset
 	if user.MustResetPassword {
 		return nil, errors.New("PASSWORD_RESET_REQUIRED")
 	}
 
-	// 🔐 Require 2FA only AFTER first successful login
+	// 4️⃣ 2FA FLOW (only after first successful login)
 	if user.TwoFAEnabled && user.LastLoginAt != nil {
 
-	if err := s.sendOTP(user); err != nil {
-		return nil, err
+		// 🔍 Check remembered device FIRST
+		deviceToken, _ := c.Cookie("remember_device")
+		if deviceToken != "" {
+			hashed := utils.HashRememberDeviceToken(deviceToken)
+			if s.deviceRepo.ExistsValid(user.ID, hashed) {
+				return s.issueTokens(user)
+			}
+		}
+
+		// ❌ Device not trusted → send OTP
+		if err := s.sendOTP(user); err != nil {
+			return nil, err
+		}
+
+		// 🔐 Issue short-lived 2FA token (carry remember intent)
+		twoFAToken, err := utils.Generate2FAToken(
+			user.ID,
+			rememberDevice,
+			s.cfg.JWT.AccessSecret,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		return nil, errors.New("TWO_FA_REQUIRED:" + twoFAToken)
 	}
 
-	twoFAToken, err := utils.Generate2FAToken(
-		user.ID,
-		s.cfg.JWT.AccessSecret,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return nil, errors.New("TWO_FA_REQUIRED:" + twoFAToken)
-}
-
-
-	// ✅ Normal login (first time OR 2FA disabled)
+	// 5️⃣ Normal login (first login OR 2FA disabled)
 	accessToken, err := utils.GenerateAccessToken(
 		user,
 		s.cfg.JWT.AccessSecret,
@@ -134,21 +154,18 @@ func (s *AuthService) Login(
 		return nil, err
 	}
 
-now := time.Now()
+	// 6️⃣ First login → enable 2FA & set last login
+	now := time.Now()
+	if user.LastLoginAt == nil {
+		_ = s.repo.UpdateLastLogin(user.ID, &now)
+		_ = s.repo.Enable2FA(user.ID)
 
-if user.LastLoginAt == nil {
-	_ = s.repo.UpdateLastLogin(user.ID, &now)
-	_ = s.repo.Enable2FA(user.ID)
+		// reload user
+		user, _ = s.repo.FindUserByID(user.ID)
+	}
 
-	// 🔥 RELOAD USER FROM DB
-	user, _ = s.repo.FindUserByID(user.ID)
-}
-
-log.Println("2FA enabled:", user.TwoFAEnabled)
-log.Println("Last login:", user.LastLoginAt)
-
-
-
+	log.Println("2FA enabled:", user.TwoFAEnabled)
+	log.Println("Last login:", user.LastLoginAt)
 
 	return &LoginResponse{
 		AccessToken:  accessToken,
@@ -499,27 +516,60 @@ func (s *AuthService) sendOTP(user *models.User) error {
 func (s *AuthService) Verify2FA(
 	userID uuid.UUID,
 	code string,
-) (*LoginResponse, error) {
+	remember bool,        // 👈 from 2FA JWT
+	ip string,
+	userAgent string,
+) (*LoginResponse, *string, error) {
 
-	hashed := utils.HashToken(code)
+	// 1️⃣ Verify OTP
+	hashedOTP := utils.HashToken(code)
 
-	otp, err := s.repo.FindValid2FAOTP(userID, hashed)
+	otp, err := s.repo.FindValid2FAOTP(userID, hashedOTP)
 	if err != nil {
-		return nil, errors.New("invalid or expired otp")
+		return nil, nil, errors.New("invalid or expired otp")
 	}
 
 	_ = s.repo.MarkOTPUsed(otp.ID)
 
+	// 2️⃣ Load user
 	user, err := s.repo.FindUserByID(userID)
 	if err != nil {
-		return nil, errors.New("user not found")
+		return nil, nil, errors.New("user not found")
 	}
 
+	// 3️⃣ Update last login
 	now := time.Now()
 	_ = s.repo.UpdateLastLogin(user.ID, &now)
 
-	return s.issueTokens(user)
+	// 4️⃣ Remember device (ONLY after OTP success)
+	var rememberDeviceToken *string
+
+	if remember {
+		rawToken, err := utils.GenerateRandomToken(32)
+		if err == nil {
+			hashed := utils.HashRememberDeviceToken(rawToken)
+
+			_ = s.deviceRepo.Create(&models.RememberedDevice{
+				UserID:    user.ID,
+				Token:     hashed,
+				UserAgent: userAgent,
+				IPAddress: ip,
+				ExpiresAt: time.Now().Add(30 * 24 * time.Hour),
+			})
+
+			rememberDeviceToken = &rawToken
+		}
+	}
+
+	// 5️⃣ Issue access + refresh tokens
+	resp, err := s.issueTokens(user)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return resp, rememberDeviceToken, nil
 }
+
 
 
 func (s *AuthService) issueTokens(user *models.User) (*LoginResponse, error) {

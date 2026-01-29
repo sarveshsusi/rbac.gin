@@ -1,9 +1,11 @@
 package service
 
 import (
-	"github.com/google/uuid"
+
 	"rbac/models"
 	"rbac/repository"
+
+	"github.com/google/uuid"
 )
 
 type FeedbackService struct {
@@ -14,6 +16,12 @@ func NewFeedbackService(r *repository.FeedbackRepository) *FeedbackService {
 	return &FeedbackService{repo: r}
 }
 
+
+
+
+
+
+
 func (s *FeedbackService) Submit(
 	ticketID uuid.UUID,
 	engineerID uuid.UUID,
@@ -21,12 +29,10 @@ func (s *FeedbackService) Submit(
 	comment string,
 ) error {
 
-	feedback := &models.TicketFeedback{
-		TicketID:  ticketID,
+	return s.repo.Create(&models.TicketFeedback{
+		TicketID:   ticketID,
 		EngineerID: engineerID,
 		Rating:    rating,
 		Comment:   comment,
-	}
-
-	return s.repo.Create(feedback)
+	})
 }

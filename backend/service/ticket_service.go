@@ -1,23 +1,33 @@
 package service
 
 import (
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
 
+	"rbac/domain"
 	"rbac/models"
 	"rbac/repository"
 )
 
 type TicketService struct {
-	repo *repository.TicketRepository
+	repo           *repository.TicketRepository
+	attachmentRepo *repository.TicketAttachmentRepository
+	escalationRepo *repository.TicketEscalationRepository
 }
 
-func NewTicketService(r *repository.TicketRepository) *TicketService {
-	return &TicketService{repo: r}
+func NewTicketService(
+	repo *repository.TicketRepository,
+	attachmentRepo *repository.TicketAttachmentRepository,
+	escalationRepo *repository.TicketEscalationRepository,
+) *TicketService {
+	return &TicketService{
+		repo:           repo,
+		attachmentRepo: attachmentRepo,
+		escalationRepo: escalationRepo,
+	}
 }
-
-
 
 /* =====================
    CREATE TICKET (CUSTOMER)
@@ -26,7 +36,6 @@ func (s *TicketService) CreateTicket(
 	customerID uuid.UUID,
 	title string,
 	description string,
-	priority models.TicketPriority,
 	productID uuid.UUID,
 	amc models.AMCContract,
 ) (*models.Ticket, error) {
@@ -39,7 +48,7 @@ func (s *TicketService) CreateTicket(
 		AMCId:       amc.ID,
 		Title:       title,
 		Description: description,
-		Priority:    priority,
+		Priority:    models.PriorityLow, // enforced
 		Status:      models.TicketCustomerCreated,
 		SLAHours:    amc.SLAHours,
 		TargetAt:    &target,
@@ -54,25 +63,73 @@ func (s *TicketService) CreateTicket(
 }
 
 /* =====================
+   INTERNAL: STATE CHANGE
+===================== */
+func (s *TicketService) changeStatus(
+	ticketID uuid.UUID,
+	newStatus models.TicketStatus,
+	by uuid.UUID,
+) error {
+
+	ticket, err := s.repo.FindByID(ticketID)
+	if err != nil {
+		return err
+	}
+
+	if !domain.CanTransition(ticket.Status, newStatus) {
+		return errors.New("invalid ticket status transition")
+	}
+
+	return s.repo.UpdateStatus(
+		s.repo.DB(),
+		ticketID,
+		newStatus,
+		by,
+	)
+}
+
+/* =====================
+   ADMIN REVIEW
+===================== */
+func (s *TicketService) AdminReviewTicket(
+	ticketID uuid.UUID,
+	adminID uuid.UUID,
+) error {
+	return s.changeStatus(
+		ticketID,
+		models.TicketAdminReviewed,
+		adminID,
+	)
+}
+
+/* =====================
    ADMIN ASSIGN
 ===================== */
 func (s *TicketService) AssignTicket(
 	ticketID uuid.UUID,
 	engineerID uuid.UUID,
 	adminID uuid.UUID,
+	productID uuid.UUID,
+	priority models.TicketPriority,
 ) error {
 
-	return s.repo.WithTransaction(func(txRepo *repository.TicketRepository) error {
-		if err := txRepo.CreateAssignment(
-			ticketID,
-			engineerID,
-			adminID,
-		); err != nil {
+	return s.repo.WithTransaction(func(tx *repository.TicketRepository) error {
+
+		if err := tx.CreateAssignment(ticketID, engineerID, adminID); err != nil {
 			return err
 		}
 
-		return txRepo.UpdateStatus(
-			txRepo.DB(),
+		if err := tx.DB().
+			Model(&models.Ticket{}).
+			Where("id = ?", ticketID).
+			Updates(map[string]interface{}{
+				"priority":   priority,
+				"product_id": productID,
+			}).Error; err != nil {
+			return err
+		}
+
+		return s.changeStatus(
 			ticketID,
 			models.TicketAssignedSupport,
 			adminID,
@@ -87,9 +144,7 @@ func (s *TicketService) ResolveTicket(
 	ticketID uuid.UUID,
 	engineerID uuid.UUID,
 ) error {
-
-	return s.repo.UpdateStatus(
-		s.repo.DB(),
+	return s.changeStatus(
 		ticketID,
 		models.TicketResolvedSupport,
 		engineerID,
@@ -104,10 +159,32 @@ func (s *TicketService) CloseTicket(
 	adminID uuid.UUID,
 ) error {
 
-	return s.repo.UpdateStatus(
-		s.repo.DB(),
+	if err := s.changeStatus(
 		ticketID,
 		models.TicketClosedByAdmin,
 		adminID,
+	); err != nil {
+		return err
+	}
+
+	// clear escalation record if exists
+	return s.escalationRepo.ResolveByTicket(ticketID)
+}
+
+/* =====================
+   ATTACHMENT (IMAGEKIT URL)
+===================== */
+func (s *TicketService) AddAttachment(
+	ticketID uuid.UUID,
+	url string,
+	fileType string,
+	userID uuid.UUID,
+) error {
+
+	return s.attachmentRepo.Create(
+		ticketID,
+		url,
+		fileType,
+		userID,
 	)
 }

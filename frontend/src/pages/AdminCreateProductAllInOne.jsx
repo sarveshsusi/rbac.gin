@@ -8,8 +8,11 @@ import {
   createModel,
 } from "../api/adminLookup.api";
 import { createProduct } from "../api/product.api";
+import { useToast } from "../components/toast/usetoast";
 
 export default function AdminCreateProductAllInOne() {
+  const { showToast } = useToast();
+
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
   const [models, setModels] = useState([]);
@@ -24,76 +27,106 @@ export default function AdminCreateProductAllInOne() {
 
   const [productName, setProductName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [selectionLocked, setSelectionLocked] = useState(false);
 
-  /* LOAD CATEGORIES */
-  useEffect(() => {
-    getCategories()
-      .then((res) => setCategories(res.data || []))
-      .catch(() => setCategories([]));
-  }, []);
+  // 🔥 Loading states for skeletons
+  const [loadingCategories, setLoadingCategories] = useState(true);
+  const [loadingBrands, setLoadingBrands] = useState(false);
+  const [loadingModels, setLoadingModels] = useState(false);
 
-  /* LOAD BRANDS */
-  useEffect(() => {
-    if (!categoryId) {
-      setBrands([]);
-      setBrandId("");
-      return;
-    }
+  /* =======================
+     LOAD CATEGORIES
+  ======================= */
+useEffect(() => {
+  setLoadingCategories(true);
+  getCategories()
+    .then((r) => setCategories(r.data || []))
+    .catch(() => showToast("Failed to load categories", "error"))
+    .finally(() => setLoadingCategories(false));
+}, [showToast]);
 
-    getBrandsByCategory(categoryId)
-      .then((res) => setBrands(res.data || []))
-      .catch(() => setBrands([]));
-  }, [categoryId]);
 
-  /* LOAD MODELS */
-  useEffect(() => {
-    if (!brandId) {
-      setModels([]);
-      setModelId("");
-      return;
-    }
+  /* =======================
+     LOAD BRANDS
+  ======================= */
+useEffect(() => {
+  if (!categoryId) {
+    setBrands([]);
+    return;
+  }
 
-    getModelsByBrand(brandId)
-      .then((res) => setModels(res.data || []))
-      .catch(() => setModels([]));
-  }, [brandId]);
+  setLoadingBrands(true);
+  getBrandsByCategory(categoryId)
+    .then((r) => setBrands(r.data || []))
+    .catch(() => showToast("Failed to load brands", "error"))
+    .finally(() => setLoadingBrands(false));
+}, [categoryId, showToast]);
 
-  /* CREATE CATEGORY */
+
+  /* =======================
+     LOAD MODELS
+  ======================= */
+useEffect(() => {
+  if (!brandId) {
+    setModels([]);
+    return;
+  }
+
+  setLoadingModels(true);
+  getModelsByBrand(brandId)
+    .then((r) => setModels(r.data || []))
+    .catch(() => showToast("Failed to load models", "error"))
+    .finally(() => setLoadingModels(false));
+}, [brandId, showToast]);
+
+
+  /* =======================
+     CREATE LOOKUPS
+  ======================= */
   const addCategory = async () => {
-    if (!newCategory.trim()) return;
-
+    if (!newCategory.trim()) {
+      showToast("Category name required", "error");
+      return;
+    }
     const res = await createCategory(newCategory.trim());
-    setCategories((prev) => [...prev, res.data]);
+    setCategories((p) => [...p, res.data]);
     setCategoryId(res.data.id);
     setNewCategory("");
+    showToast("Category created");
   };
 
-  /* CREATE BRAND */
   const addBrand = async () => {
-    if (!newBrand.trim() || !categoryId) return;
-
+    if (!categoryId) {
+      showToast("Select category first", "info");
+      return;
+    }
     const res = await createBrand(newBrand.trim(), categoryId);
-    setBrands((prev) => [...prev, res.data]);
+    setBrands((p) => [...p, res.data]);
     setBrandId(res.data.id);
     setNewBrand("");
+    showToast("Brand created");
   };
 
-  /* CREATE MODEL */
   const addModel = async () => {
-    if (!newModel.trim() || !brandId) return;
-
+    if (!brandId) {
+      showToast("Select brand first", "info");
+      return;
+    }
     const res = await createModel(newModel.trim(), brandId);
-    setModels((prev) => [...prev, res.data]);
+    setModels((p) => [...p, res.data]);
     setModelId(res.data.id);
     setNewModel("");
+    showToast("Model created");
   };
 
-  /* CREATE PRODUCT */
+  /* =======================
+     SUBMIT PRODUCT
+  ======================= */
   const submit = async (e) => {
     e.preventDefault();
 
-    if (!categoryId || !brandId || !modelId || !productName.trim()) {
-      alert("Complete all steps");
+    if (!selectionLocked || !productName.trim()) {
+      showToast("Enter product name", "error");
       return;
     }
 
@@ -106,109 +139,169 @@ export default function AdminCreateProductAllInOne() {
         model_id: modelId,
       });
 
-      alert("Product created successfully");
+      showToast("Product created successfully 🎉", "success");
+
+      // 🔥 RESET FLOW
       setProductName("");
+      setCategoryId("");
+      setBrandId("");
+      setModelId("");
+      setBrands([]);
+      setModels([]);
+      setSelectionLocked(false);
+    } catch {
+      showToast("Failed to create product", "error");
     } finally {
       setLoading(false);
     }
   };
 
+  const progress = selectionLocked ? 100 : 50;
+
   return (
-    <form
-      onSubmit={submit}
-      className="bg-white p-6 rounded-xl shadow max-w-xl space-y-4"
-    >
-      <h1 className="text-2xl font-semibold">Create Product (All in One)</h1>
+    <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
+      {/* PROGRESS BAR */}
+      <div className="h-2 bg-slate-200 rounded-full">
+        <div
+          className="h-full bg-blue-600 transition-all duration-500"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
 
-      {/* CATEGORY */}
-      <select
-        className="w-full border rounded px-3 py-2"
-        value={categoryId}
-        onChange={(e) => setCategoryId(e.target.value)}
-      >
-        <option value="">Select Category</option>
-        {categories.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name}
-          </option>
-        ))}
-      </select>
+      <Stepper activeStep={selectionLocked ? 2 : 1} />
 
-      <input
-        className="border px-3 py-2 rounded"
-        placeholder="New category"
-        value={newCategory}
-        onChange={(e) => setNewCategory(e.target.value)}
-      />
-      <button type="button" onClick={addCategory}>+ Add Category</button>
+      {/* STEP 1 */}
+      <EnterpriseCard title="Product Selection">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Select
+            value={categoryId}
+            onChange={setCategoryId}
+            options={categories}
+            placeholder="Category"
+            loading={loadingCategories}
+          />
+          <Select
+            value={brandId}
+            onChange={setBrandId}
+            options={brands}
+            placeholder="Brand"
+            disabled={!categoryId}
+            loading={loadingBrands}
+          />
+          <Select
+            value={modelId}
+            onChange={setModelId}
+            options={models}
+            placeholder="Model"
+            disabled={!brandId}
+            loading={loadingModels}
+          />
 
-      {/* BRAND */}
-      <select
-        className="w-full border rounded px-3 py-2"
-        value={brandId}
-        onChange={(e) => setBrandId(e.target.value)}
-        disabled={!categoryId}
-      >
-        <option value="">Select Brand</option>
-        {brands.map((b) => (
-          <option key={b.id} value={b.id}>
-            {b.name}
-          </option>
-        ))}
-      </select>
+          <button
+            disabled={!categoryId || !brandId || !modelId}
+            onClick={() => {
+              setSelectionLocked(true);
+              showToast("Selection locked", "info");
+            }}
+            className="bg-blue-600 text-white rounded-xl px-6 py-3"
+          >
+            Select
+          </button>
+        </div>
 
-      <input
-        className="border px-3 py-2 rounded"
-        placeholder="New brand"
-        value={newBrand}
-        onChange={(e) => setNewBrand(e.target.value)}
-        disabled={!categoryId}
-      />
-      <button type="button" onClick={addBrand} disabled={!categoryId}>
-        + Add Brand
-      </button>
+        {!selectionLocked && (
+          <div className="mt-6 space-y-4">
+            <InlineAdd value={newCategory} onChange={setNewCategory} onAdd={addCategory} placeholder="New category" />
+            <InlineAdd value={newBrand} onChange={setNewBrand} onAdd={addBrand} placeholder="New brand" disabled={!categoryId} />
+            <InlineAdd value={newModel} onChange={setNewModel} onAdd={addModel} placeholder="New model" disabled={!brandId} />
+          </div>
+        )}
+      </EnterpriseCard>
 
-      {/* MODEL */}
-      <select
-        className="w-full border rounded px-3 py-2"
-        value={modelId}
-        onChange={(e) => setModelId(e.target.value)}
-        disabled={!brandId}
-      >
-        <option value="">Select Model</option>
-        {models.map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.name}
-          </option>
-        ))}
-      </select>
-
-      <input
-        className="border px-3 py-2 rounded"
-        placeholder="New model"
-        value={newModel}
-        onChange={(e) => setNewModel(e.target.value)}
-        disabled={!brandId}
-      />
-      <button type="button" onClick={addModel} disabled={!brandId}>
-        + Add Model
-      </button>
-
-      {/* PRODUCT */}
-      <input
-        className="w-full border rounded px-3 py-2"
-        placeholder="Product name"
-        value={productName}
-        onChange={(e) => setProductName(e.target.value)}
-        disabled={!modelId}
-      />
-
-      <button
-        disabled={loading}
-        className="bg-blue-600 text-white w-full py-2 rounded"
-      >
-        {loading ? "Creating..." : "Create Product"}
-      </button>
-    </form>
+      {/* STEP 2 */}
+      <EnterpriseCard title="Create Product">
+        <form onSubmit={submit} className="space-y-4">
+          <input
+            disabled={!selectionLocked}
+            value={productName}
+            onChange={(e) => setProductName(e.target.value)}
+            placeholder="Product name"
+            className="enterprise-input"
+          />
+          <button
+            disabled={loading}
+            className="bg-blue-600 text-white px-10 py-3 rounded-xl w-full md:w-auto"
+          >
+            {loading ? "Creating..." : "Create Product"}
+          </button>
+        </form>
+      </EnterpriseCard>
+    </div>
   );
 }
+
+/* =======================
+   UI COMPONENTS
+======================= */
+
+const Stepper = ({ activeStep }) => (
+  <div className="flex items-center gap-6">
+    <Step active={activeStep >= 1} label="Select" />
+    <div className="flex-1 h-px bg-slate-300" />
+    <Step active={activeStep >= 2} label="Create" />
+  </div>
+);
+
+const Step = ({ active, label }) => (
+  <div className="flex items-center gap-2">
+    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${active ? "bg-blue-600 text-white" : "bg-slate-300"}`}>
+      ✓
+    </div>
+    <span className="text-sm">{label}</span>
+  </div>
+);
+
+const EnterpriseCard = ({ title, children }) => (
+  <div className="bg-white rounded-2xl border border-slate-300 p-6 space-y-6">
+    <h2 className="font-semibold">{title}</h2>
+    {children}
+  </div>
+);
+
+const Select = ({ value, onChange, options, placeholder, disabled, loading }) => (
+  <select
+    disabled={disabled || loading}
+    value={value}
+    onChange={(e) => onChange(e.target.value)}
+    className="enterprise-input"
+  >
+    <option value="">
+      {loading ? "Loading..." : placeholder}
+    </option>
+    {!loading &&
+      options.map((o) => (
+        <option key={o.id} value={o.id}>
+          {o.name}
+        </option>
+      ))}
+  </select>
+);
+
+const InlineAdd = ({ value, onChange, onAdd, placeholder, disabled }) => (
+  <div className="flex gap-3">
+    <input
+      disabled={disabled}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      className="enterprise-input flex-1"
+    />
+    <button
+      onClick={onAdd}
+      disabled={disabled}
+      className="text-blue-600 text-sm"
+    >
+      + Add
+    </button>
+  </div>
+);

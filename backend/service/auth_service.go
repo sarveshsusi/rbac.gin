@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 
 	"math/big"
 	"rbac/config"
@@ -18,6 +19,7 @@ import (
 )
 
 type AuthService struct {
+	db           *gorm.DB
 	repo      *repository.AuthRepository
 	deviceRepo *repository.RememberedDeviceRepo
 	customerRepo *repository.CustomerRepository 
@@ -26,12 +28,14 @@ type AuthService struct {
 }
 
 func NewAuthService(
+	db *gorm.DB,
 	repo *repository.AuthRepository,
 	deviceRepo *repository.RememberedDeviceRepo,
 	customerRepo *repository.CustomerRepository,
 	cfg *config.Config,
 ) *AuthService {
 	return &AuthService{
+		db:           db,
 		repo:      repo,
 		deviceRepo: deviceRepo,
 		customerRepo: customerRepo, 
@@ -388,14 +392,19 @@ func (s *AuthService) CreateUser(
 	createdBy uuid.UUID,
 	ip string,
 	userAgent string,
+
+	company string,
+	phone string,
+	address string,
 ) (*models.User, error) {
 
+	// 1️⃣ Check existing user
 	existing, _ := s.repo.FindUserByEmail(email)
 	if existing != nil {
 		return nil, errors.New("user already exists")
 	}
 
-	// 🔒 Generate temporary random password (never shown)
+	// 2️⃣ Generate temp password
 	tempPassword, err := utils.GenerateRandomToken(16)
 	if err != nil {
 		return nil, err
@@ -406,34 +415,63 @@ func (s *AuthService) CreateUser(
 		return nil, err
 	}
 
-	user := &models.User{
-		Name:              name,
-		Email:             email,
-		Password:          hashed,
-		Role:              role,
-		IsActive:          true,
-		MustResetPassword: true,
-		CreatedBy:         &createdBy,
-	}
+	var createdUser *models.User
 
-	if err := s.repo.CreateUser(user); err != nil {
+	// 3️⃣ TRANSACTION START
+	err = s.db.Transaction(func(tx *gorm.DB) error {
+
+		user := &models.User{
+			Name:              name,
+			Email:             email,
+			Password:          hashed,
+			Role:              role,
+			IsActive:          true,
+			MustResetPassword: true,
+			CreatedBy:         &createdBy,
+		}
+
+		// ✅ Create user (TX SAFE)
+		if err := s.repo.CreateUserTx(tx, user); err != nil {
+			return err
+		}
+
+		// ✅ Create customer profile ONLY for customers
+		if role == models.RoleCustomer {
+			customer := &models.Customer{
+				UserID:   user.ID,
+				Company: company,
+				Phone:   phone,
+				Address: address,
+				IsActive: true,
+			}
+
+			if err := s.customerRepo.Create(tx, customer); err != nil {
+				return err
+			}
+		}
+
+		createdUser = user
+		return nil
+	})
+
+	if err != nil {
 		return nil, err
 	}
-	if role == models.RoleCustomer {
-		if err := s.customerRepo.Create(user.ID); err != nil {
-			return nil, err
-		}
-	}
+	// 🔚 TRANSACTION END
 
-	// 🔑 Create reset token
-	resetToken, err := s.CreatePasswordReset(user)
+	// 4️⃣ Create password reset token
+	resetToken, err := s.CreatePasswordReset(createdUser)
 	if err != nil {
 		return nil, err
 	}
 
 	resetURL := s.cfg.FrontendURL + "/reset-password?token=" + resetToken
 
-	// 📧 Send email
+	// 5️⃣ Send email
+	if s.mailer == nil {
+		return nil, errors.New("email service not configured")
+	}
+
 	body := `
 		<h2>Welcome to RBAC App</h2>
 		<p>Your account has been created.</p>
@@ -441,21 +479,19 @@ func (s *AuthService) CreateUser(
 			<a href="` + resetURL + `">Click here to set your password</a>
 		</p>
 		<p>This link expires in 24 hours.</p>
-   	`
+	`
 
-	if s.mailer == nil {
-	return nil, errors.New("email service not configured")
-}
 	if err := s.mailer.Send(
-	user.Email,
-	"Set your password",
-	body,
-); err != nil {
-	return nil, err
+		createdUser.Email,
+		"Set your password",
+		body,
+	); err != nil {
+		return nil, err
+	}
+
+	return createdUser, nil
 }
 
-	return user, nil
-}
 
 func (s *AuthService) SendPasswordResetEmail(email string) error {
 	user, err := s.repo.FindUserByEmail(email)

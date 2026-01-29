@@ -54,6 +54,13 @@ func (r *AuthRepository) FindUserByID(id uuid.UUID) (*models.User, error) {
 func (r *AuthRepository) CreateUser(user *models.User) error {
 	return r.db.Create(user).Error
 }
+func (r *AuthRepository) CreateUserTx(
+	tx *gorm.DB,
+	user *models.User,
+) error {
+	return tx.Create(user).Error
+}
+
 
 func (r *AuthRepository) UpdateUserPassword(
 	userID uuid.UUID,

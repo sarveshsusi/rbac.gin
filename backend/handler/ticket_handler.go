@@ -8,38 +8,49 @@ import (
 
 	"rbac/models"
 	"rbac/service"
+	"rbac/utils"
 )
 
 type TicketHandler struct {
-	service *service.TicketService
+	service  *service.TicketService
+	uploader utils.ImageUploader
 }
 
-func NewTicketHandler(s *service.TicketService) *TicketHandler {
-	return &TicketHandler{service: s}
+func NewTicketHandler(
+	s *service.TicketService,
+	uploader utils.ImageUploader,
+) *TicketHandler {
+	return &TicketHandler{
+		service:  s,
+		uploader: uploader,
+	}
 }
 
 /* =====================
-   CREATE TICKET
+   CREATE TICKET (CUSTOMER)
+   - Customer can ONLY set title + description
 ===================== */
 
 type CreateTicketRequest struct {
-	Title       string                `json:"title" binding:"required"`
-	Description string                `json:"description"`
-	Priority    models.TicketPriority `json:"priority" binding:"required"`
-	ProductID   uuid.UUID             `json:"product_id" binding:"required"`
-	AMCId       uuid.UUID             `json:"amc_id" binding:"required"`
+	Title       string    `json:"title" binding:"required"`
+	Description string    `json:"description"`
+	ProductID   uuid.UUID `json:"product_id" binding:"required"`
+	AMCId       uuid.UUID `json:"amc_id" binding:"required"`
 }
 
 func (h *TicketHandler) CreateTicket(c *gin.Context) {
+
 	customerID := c.MustGet("user_id").(uuid.UUID)
 
 	var req CreateTicketRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid request",
+		})
 		return
 	}
 
-	// AMC should be fetched from service/db — simplified here
+	// AMC should be fetched from DB — simplified here
 	amc := models.AMCContract{
 		ID:       req.AMCId,
 		SLAHours: 24,
@@ -49,12 +60,13 @@ func (h *TicketHandler) CreateTicket(c *gin.Context) {
 		customerID,
 		req.Title,
 		req.Description,
-		req.Priority,
 		req.ProductID,
 		amc,
 	)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
 		return
 	}
 
@@ -66,55 +78,107 @@ func (h *TicketHandler) CreateTicket(c *gin.Context) {
 ===================== */
 
 type AssignTicketRequest struct {
-	EngineerID uuid.UUID `json:"engineer_id" binding:"required"`
+	EngineerID uuid.UUID             `json:"engineer_id" binding:"required"`
+	ProductID  uuid.UUID             `json:"product_id" binding:"required"`
+	Priority   models.TicketPriority `json:"priority" binding:"required"`
 }
 
 func (h *TicketHandler) AssignTicket(c *gin.Context) {
-	ticketID, _ := uuid.Parse(c.Param("id"))
+
+	ticketID := uuid.MustParse(c.Param("id"))
 	adminID := c.MustGet("user_id").(uuid.UUID)
 
 	var req AssignTicketRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid request",
+		})
 		return
 	}
 
-	if err := h.service.AssignTicket(ticketID, req.EngineerID, adminID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := h.service.AssignTicket(
+		ticketID,
+		req.EngineerID,
+		adminID,
+		req.ProductID,
+		req.Priority,
+	); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "ticket assigned"})
+	c.JSON(http.StatusOK, gin.H{
+		"message": "ticket assigned successfully",
+	})
 }
 
 /* =====================
    SUPPORT RESOLVE
+   - Proof image is mandatory
+   - Uploaded to ImageKit
 ===================== */
 
-func (h *TicketHandler) ResolveTicket(c *gin.Context) {
-	ticketID, _ := uuid.Parse(c.Param("id"))
-	engineerID := c.MustGet("user_id").(uuid.UUID)
-
-	if err := h.service.ResolveTicket(ticketID, engineerID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "ticket resolved"})
-}
 
 /* =====================
    ADMIN CLOSE
 ===================== */
 
 func (h *TicketHandler) CloseTicket(c *gin.Context) {
-	ticketID, _ := uuid.Parse(c.Param("id"))
+
+	ticketID := uuid.MustParse(c.Param("id"))
 	adminID := c.MustGet("user_id").(uuid.UUID)
 
 	if err := h.service.CloseTicket(ticketID, adminID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "ticket closed"})
+	c.JSON(http.StatusOK, gin.H{
+		"message": "ticket closed successfully",
+	})
+}
+
+func (h *TicketHandler) ResolveTicket(c *gin.Context) {
+
+	ticketID := uuid.MustParse(c.Param("id"))
+	engineerID := c.MustGet("user_id").(uuid.UUID)
+
+	file, err := c.FormFile("proof")
+	if err != nil {
+		c.JSON(400, gin.H{"error": "proof image required"})
+		return
+	}
+
+	// ✅ Upload via ImageKit HTTP uploader
+	url, err := h.uploader.Upload(file)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "image upload failed"})
+		return
+	}
+
+	// ✅ Save attachment
+	if err := h.service.AddAttachment(
+		ticketID,
+		url,
+		"image",
+		engineerID,
+	); err != nil {
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	// ✅ Resolve ticket
+	if err := h.service.ResolveTicket(ticketID, engineerID); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"message":   "ticket resolved",
+		"proof_url": url,
+	})
 }

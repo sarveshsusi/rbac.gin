@@ -34,17 +34,16 @@ func NewCustomerProductService(
 // 	return s.repo.Assign(customerID, productID)
 // }
 
+
 func (s *CustomerProductService) AssignProductToCustomer(
 	userID uuid.UUID,
 	productID uuid.UUID,
 ) error {
 
-	// 🔥 STEP 1: find customer by user_id
 	customer, err := s.repo.GetCustomerByUserID(userID)
 	if err != nil {
 		return errors.New("customer profile not found")
 	}
 
-	// 🔥 STEP 2: assign product using customer.id
 	return s.repo.Assign(customer.ID, productID)
 }

@@ -10,13 +10,14 @@ type Config struct {
 	Server      ServerConfig
 	Database    DatabaseConfig
 	JWT         JWTConfig
-	FrontendURL string     // ✅ ADD
-	Mail        MailConfig // ✅ ADD
+	FrontendURL string
+	Mail        MailConfig
+	ImageKit    ImageKitConfig // ✅ ADDED
 }
 
 type ServerConfig struct {
 	Port string
-	Env  string // development | production
+	Env  string
 }
 
 type DatabaseConfig struct {
@@ -31,7 +32,7 @@ type JWTConfig struct {
 }
 
 /* =====================
-   Mail (Mailtrap)
+   Mail (SMTP / Mailtrap)
 ===================== */
 
 type MailConfig struct {
@@ -40,6 +41,16 @@ type MailConfig struct {
 	Username string
 	Password string
 	From     string
+}
+
+/* =====================
+   ImageKit (CDN Uploads)
+===================== */
+
+type ImageKitConfig struct {
+	PublicKey  string
+	PrivateKey string
+	Endpoint   string
 }
 
 func LoadConfig() *Config {
@@ -57,17 +68,20 @@ func LoadConfig() *Config {
 			AccessExpiry:  15 * time.Minute,
 			RefreshExpiry: 7 * 24 * time.Hour,
 		},
-
-		// ✅ FRONTEND URL (for reset links)
 		FrontendURL: getEnv("FRONTEND_URL", "http://localhost:5173"),
 
-		// ✅ MAILTRAP CONFIG
 		Mail: MailConfig{
 			Host:     getEnv("MAIL_HOST", ""),
 			Port:     getEnvAsInt("MAIL_PORT", 587),
 			Username: getEnv("MAIL_USERNAME", ""),
 			Password: getEnv("MAIL_PASSWORD", ""),
 			From:     getEnv("MAIL_FROM", "rbac@app.com"),
+		},
+
+		ImageKit: ImageKitConfig{
+			PublicKey:  getEnv("IMAGEKIT_PUBLIC_KEY", ""),
+			PrivateKey: getEnv("IMAGEKIT_PRIVATE_KEY", ""),
+			Endpoint:   getEnv("IMAGEKIT_ENDPOINT", ""),
 		},
 	}
 }

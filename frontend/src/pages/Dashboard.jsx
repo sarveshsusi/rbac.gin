@@ -72,7 +72,7 @@ export default function Dashboard() {
           {cards.map((item, i) => (
             <div
               key={i}
-              className="snap-center flex-shrink-0"
+              className="snap-center shrink-0"
               style={{ width: "85%" }} // 👈 peek next card
             >
               {loading ? (

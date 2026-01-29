@@ -57,7 +57,11 @@ type RefreshRequest struct {
 type CreateUserRequest struct {
 	Name  string      `json:"name" binding:"required"`	
 	Email string      `json:"email" binding:"required,email"`
-	Role  models.Role `json:"role" binding:"required,oneof=support customer"`
+	Role  models.Role `json:"role" binding:"required,oneof=admin support customer"`
+
+	Company string `json:"company"`
+	Phone   string `json:"phone"`
+	Address string `json:"address"`
 }
 
 type ChangePasswordRequest struct {
@@ -227,6 +231,10 @@ func (h *AuthHandler) CreateUser(c *gin.Context) {
 		createdBy,
 		c.ClientIP(),
 		c.GetHeader("User-Agent"),
+
+		req.Company,
+		req.Phone,
+		req.Address,
 	)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

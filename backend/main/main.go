@@ -13,6 +13,7 @@ import (
 	"rbac/repository"
 	"rbac/routes"
 	"rbac/service"
+	"rbac/utils"
 )
 
 func main() {
@@ -20,7 +21,7 @@ func main() {
 	   ENV & CONFIG
 	========================= */
 	if err := godotenv.Load(); err != nil {
-		log.Println("⚠️  No .env file found, relying on system env vars")
+		log.Println("⚠️  No .env file found, using system env vars")
 	}
 
 	cfg := config.LoadConfig()
@@ -39,6 +40,7 @@ func main() {
 	/* =========================
 	   GIN ENGINE
 	========================= */
+	db := database.DB
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
 
@@ -57,14 +59,16 @@ func main() {
 	authRepo := repository.NewAuthRepository(database.DB)
 	rememberedDeviceRepo := repository.NewRememberedDeviceRepo(database.DB)
 
-	dashboardRepo := repository.NewDashboardRepository(database.DB)
 	ticketRepo := repository.NewTicketRepository(database.DB)
+	attachmentRepo := repository.NewTicketAttachmentRepository(database.DB)
+	escalationRepo := repository.NewTicketEscalationRepository(database.DB)
+
 	amcRepo := repository.NewAMCRepository(database.DB)
 	productRepo := repository.NewProductRepository(database.DB)
 	customerProductRepo := repository.NewCustomerProductRepository(database.DB)
 	feedbackRepo := repository.NewFeedbackRepository(database.DB)
 	customerRepo := repository.NewCustomerRepository(database.DB)
-
+	dashboardRepo := repository.NewDashboardRepository(database.DB)
 
 	categoryRepo := repository.NewCategoryRepository(database.DB)
 	brandRepo := repository.NewBrandRepository(database.DB)
@@ -74,16 +78,29 @@ func main() {
 	   SERVICES
 	========================= */
 	authService := service.NewAuthService(
-		authRepo,
-		rememberedDeviceRepo,
-		customerRepo, 
-		cfg,
+	db,
+	authRepo,
+	rememberedDeviceRepo,
+	customerRepo,
+	cfg,
+)
+
+
+	ticketService := service.NewTicketService(
+		ticketRepo,
+		attachmentRepo,
+		escalationRepo,
 	)
 
 	adminService := service.NewAdminService(dashboardRepo)
 	supportService := service.NewSupportService(ticketRepo)
-	customerService := service.NewCustomerService(ticketRepo)
-	ticketService := service.NewTicketService(ticketRepo)
+	customerService := service.NewCustomerService(
+	db,
+	authRepo,
+	customerRepo,
+	ticketRepo,
+)
+
 	amcService := service.NewAMCService(amcRepo)
 	productService := service.NewProductService(productRepo)
 	customerProductService := service.NewCustomerProductService(customerProductRepo)
@@ -94,6 +111,11 @@ func main() {
 	modelService := service.NewModelService(modelRepo)
 
 	/* =========================
+	   UTILS
+	========================= */
+	imageUploader := utils.NewImageKitUploader(cfg)
+
+	/* =========================
 	   HANDLERS
 	========================= */
 	authHandler := handler.NewAuthHandler(authService, cfg)
@@ -102,7 +124,7 @@ func main() {
 	supportDashboard := handler.NewSupportDashboardHandler(supportService)
 	customerDashboard := handler.NewCustomerDashboardHandler(customerService)
 
-	ticketHandler := handler.NewTicketHandler(ticketService)
+	ticketHandler := handler.NewTicketHandler(ticketService, imageUploader)
 	amcHandler := handler.NewAMCHandler(amcService)
 	productHandler := handler.NewProductHandler(productService)
 	customerProductHandler := handler.NewCustomerProductHandler(customerProductService)
@@ -134,7 +156,7 @@ func main() {
 		customerProductHandler,
 		feedbackHandler,
 
-		// Lookups (NEW)
+		// Lookups
 		categoryHandler,
 		brandHandler,
 		modelHandler,

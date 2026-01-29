@@ -2,9 +2,11 @@
 package repository
 
 import (
+	"rbac/models"
+	"time"
+
 	"github.com/google/uuid"
 	"gorm.io/gorm"
-	"rbac/models"
 )
 
 type TicketRepository struct {
@@ -159,3 +161,30 @@ func (r *TicketRepository) CreateStatusHistory(
 		ChangedBy: changedBy,
 	}).Error
 }
+
+
+
+
+
+func (r *TicketRepository) FindOverdueTickets(
+	days int,
+) ([]models.Ticket, error) {
+
+	var tickets []models.Ticket
+
+	cutoff := time.Now().AddDate(0, 0, -days)
+
+	err := r.db.
+		Where(
+			"status NOT IN ? AND created_at < ?",
+			[]models.TicketStatus{
+				models.TicketClosedByAdmin,
+				models.TicketFeedbackGiven,
+			},
+			cutoff,
+		).
+		Find(&tickets).Error
+
+	return tickets, err
+}
+

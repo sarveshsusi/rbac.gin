@@ -13,21 +13,26 @@ export default function CreateUserCard() {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("Admin");
 
+  // 🔹 Customer-only fields
+  const [company, setCompany] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  const isCustomer = role === "Customer";
 
   const submit = async () => {
     setError("");
     setSuccess("");
 
-    // 🛑 VALIDATION
-    if (!name.trim()) {
-      return setError("Name is required");
-    }
+    if (!name.trim()) return setError("Name is required");
+    if (!email.trim()) return setError("Email is required");
 
-    if (!email.trim()) {
-      return setError("Email is required");
+    if (isCustomer && !company.trim()) {
+      return setError("Company name is required for customers");
     }
 
     try {
@@ -37,13 +42,24 @@ export default function CreateUserCard() {
         name: name.trim(),
         email: email.trim().toLowerCase(),
         role: ROLE_MAP[role],
+
+        // 👇 Only sent for customers
+        ...(isCustomer && {
+          company: company.trim(),
+          phone: phone.trim(),
+          address: address.trim(),
+        }),
       });
 
-      // ✅ SUCCESS
       setSuccess("User created. Password setup email sent.");
+
+      // reset
       setName("");
       setEmail("");
       setRole("Admin");
+      setCompany("");
+      setPhone("");
+      setAddress("");
     } catch (err) {
       setError(
         err.response?.data?.error ||
@@ -74,9 +90,8 @@ export default function CreateUserCard() {
         </p>
       </div>
 
-      {/* FORM */}
+      {/* BASIC FORM */}
       <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2">
-        {/* Name */}
         <div>
           <label className="block text-sm font-medium text-slate-700">
             Full Name
@@ -91,7 +106,6 @@ export default function CreateUserCard() {
           />
         </div>
 
-        {/* Email */}
         <div>
           <label className="block text-sm font-medium text-slate-700">
             Email Address
@@ -136,10 +150,61 @@ export default function CreateUserCard() {
         </div>
       </div>
 
+      {/* 👇 CUSTOMER FIELDS (SMOOTH + NO LAYOUT BREAK) */}
+      <div
+        className={`
+          overflow-hidden transition-all duration-500 ease-in-out
+          ${isCustomer ? "max-h-[500px] opacity-100 mt-6" : "max-h-0 opacity-0"}
+        `}
+      >
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <div>
+            <label className="block text-sm font-medium text-slate-700">
+              Company Name
+            </label>
+            <input
+              value={company}
+              onChange={(e) => setCompany(e.target.value)}
+              placeholder="Acme Corp"
+              className="mt-1 w-full rounded-xl border border-slate-300
+                         px-4 py-3 text-sm
+                         focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700">
+              Phone
+            </label>
+            <input
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+91 9876543210"
+              className="mt-1 w-full rounded-xl border border-slate-300
+                         px-4 py-3 text-sm
+                         focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+          </div>
+
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-slate-700">
+              Address
+            </label>
+            <textarea
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="Company address"
+              rows={3}
+              className="mt-1 w-full rounded-xl border border-slate-300
+                         px-4 py-3 text-sm
+                         focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+          </div>
+        </div>
+      </div>
+
       {/* FEEDBACK */}
-      {error && (
-        <p className="mt-4 text-sm text-red-600">{error}</p>
-      )}
+      {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
       {success && (
         <div className="mt-4 flex items-center gap-2 text-sm text-green-600">

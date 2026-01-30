@@ -17,9 +17,29 @@ func NewBrandHandler(s *service.BrandService) *BrandHandler {
 	return &BrandHandler{service: s}
 }
 
-/* =========================
-   GET BRANDS BY CATEGORY
-========================= */
+/*
+	=========================
+	  GET ALL BRANDS
+
+=========================
+*/
+func (h *BrandHandler) GetAll(c *gin.Context) {
+	brands, err := h.service.GetAll()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+	c.JSON(http.StatusOK, brands)
+}
+
+/*
+	=========================
+	  GET BRANDS BY CATEGORY
+
+=========================
+*/
 func (h *BrandHandler) GetByCategory(c *gin.Context) {
 	categoryID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -40,9 +60,12 @@ func (h *BrandHandler) GetByCategory(c *gin.Context) {
 	c.JSON(http.StatusOK, data)
 }
 
-/* =========================
-   CREATE BRAND (FIXED)
-========================= */
+/*
+	=========================
+	  CREATE BRAND (FIXED)
+
+=========================
+*/
 func (h *BrandHandler) Create(c *gin.Context) {
 	var body struct {
 		Name       string    `json:"name" binding:"required"`

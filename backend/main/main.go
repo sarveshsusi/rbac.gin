@@ -37,6 +37,9 @@ func main() {
 		log.Fatalf("❌ database init failed: %v", err)
 	}
 
+	// Run Migrations
+	database.Migrate(database.DB)
+
 	/* =========================
 	   GIN ENGINE
 	========================= */
@@ -60,8 +63,6 @@ func main() {
 	rememberedDeviceRepo := repository.NewRememberedDeviceRepo(database.DB)
 
 	ticketRepo := repository.NewTicketRepository(database.DB)
-	attachmentRepo := repository.NewTicketAttachmentRepository(database.DB)
-	escalationRepo := repository.NewTicketEscalationRepository(database.DB)
 
 	amcRepo := repository.NewAMCRepository(database.DB)
 	productRepo := repository.NewProductRepository(database.DB)
@@ -78,28 +79,23 @@ func main() {
 	   SERVICES
 	========================= */
 	authService := service.NewAuthService(
-	db,
-	authRepo,
-	rememberedDeviceRepo,
-	customerRepo,
-	cfg,
-)
-
-
-	ticketService := service.NewTicketService(
-		ticketRepo,
-		attachmentRepo,
-		escalationRepo,
+		db,
+		authRepo,
+		rememberedDeviceRepo,
+		customerRepo,
+		cfg,
 	)
+
+	ticketService := service.NewTicketService(ticketRepo)
 
 	adminService := service.NewAdminService(dashboardRepo)
 	supportService := service.NewSupportService(ticketRepo)
 	customerService := service.NewCustomerService(
-	db,
-	authRepo,
-	customerRepo,
-	ticketRepo,
-)
+		db,
+		authRepo,
+		customerRepo,
+		ticketRepo,
+	)
 
 	amcService := service.NewAMCService(amcRepo)
 	productService := service.NewProductService(productRepo)

@@ -18,13 +18,12 @@ export const submitFeedback = (ticketId, data) =>
 export const getAdminTickets = () =>
   api.get("/admin/tickets");
 
-export const assignTicket = (ticketId, engineerId) =>
-  api.post(`/admin/tickets/${ticketId}/assign`, {
-    engineer_id: engineerId,
-  });
+export const adminCreateTicket = (data) =>
+  api.post("/admin/tickets", data);
 
-export const closeTicket = (ticketId) =>
-  api.post(`/admin/tickets/${ticketId}/close`);
+export const assignTicket = (ticketId, data) =>
+  api.post(`/admin/tickets/${ticketId}/assign`, data); 
+  // data: { engineer_id, priority, support_mode, service_call_type }
 
 /* =====================
    SUPPORT
@@ -32,5 +31,10 @@ export const closeTicket = (ticketId) =>
 export const getSupportTickets = () =>
   api.get("/support/tickets");
 
-export const resolveTicket = (ticketId) =>
-  api.post(`/support/tickets/${ticketId}/resolve`);
+export const startTicket = (ticketId) =>
+  api.post(`/support/tickets/${ticketId}/start`);
+
+export const closeTicket = (ticketId, formData) =>
+  api.post(`/support/tickets/${ticketId}/close`, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });

@@ -15,9 +15,12 @@ func NewBrandRepository(db *gorm.DB) *BrandRepository {
 	return &BrandRepository{db: db}
 }
 
-/* =========================
-   CREATE BRAND
-========================= */
+/*
+	=========================
+	  CREATE BRAND
+
+=========================
+*/
 func (r *BrandRepository) Create(name string) (*models.Brand, error) {
 	brand := &models.Brand{
 		Name: name,
@@ -28,9 +31,24 @@ func (r *BrandRepository) Create(name string) (*models.Brand, error) {
 	return brand, nil
 }
 
-/* =========================
-   ASSIGN BRAND → CATEGORY
-========================= */
+/*
+	=========================
+	  GET ALL BRANDS
+
+=========================
+*/
+func (r *BrandRepository) GetAll() ([]models.Brand, error) {
+	var brands []models.Brand
+	err := r.db.Find(&brands).Error
+	return brands, err
+}
+
+/*
+	=========================
+	  ASSIGN BRAND → CATEGORY
+
+=========================
+*/
 func (r *BrandRepository) AssignToCategory(
 	brandID uuid.UUID,
 	categoryID uuid.UUID,
@@ -42,9 +60,12 @@ func (r *BrandRepository) AssignToCategory(
 	}).Error
 }
 
-/* =========================
-   GET BRANDS BY CATEGORY
-========================= */
+/*
+	=========================
+	  GET BRANDS BY CATEGORY
+
+=========================
+*/
 func (r *BrandRepository) GetByCategory(
 	categoryID uuid.UUID,
 ) ([]models.Brand, error) {
@@ -59,9 +80,12 @@ func (r *BrandRepository) GetByCategory(
 	return brands, err
 }
 
-/* =========================
-   VALIDATION: BRAND ↔ CATEGORY
-========================= */
+/*
+	=========================
+	  VALIDATION: BRAND ↔ CATEGORY
+
+=========================
+*/
 func (r *BrandRepository) IsAllowedForCategory(
 	brandID uuid.UUID,
 	categoryID uuid.UUID,

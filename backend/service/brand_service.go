@@ -19,6 +19,10 @@ func (s *BrandService) GetByCategory(categoryID uuid.UUID) (interface{}, error) 
 	return s.repo.GetByCategory(categoryID)
 }
 
+func (s *BrandService) GetAll() ([]models.Brand, error) {
+	return s.repo.GetAll()
+}
+
 func (s *BrandService) Create(
 	name string,
 	categoryID uuid.UUID,
@@ -37,4 +41,3 @@ func (s *BrandService) Create(
 
 	return brand, nil
 }
-

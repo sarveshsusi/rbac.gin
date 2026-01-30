@@ -15,21 +15,23 @@ type TicketRepository struct {
 
 func (r *TicketRepository) DB() *gorm.DB {
 	return r.db
-} 
+}
 func NewTicketRepository(db *gorm.DB) *TicketRepository {
 	return &TicketRepository{db: db}
 }
 
 /*
 =====================
- Transaction Helper
+
+	Transaction Helper
+
 =====================
 */
 func (r *TicketRepository) WithTx(
 	fn func(tx *gorm.DB) error,
 ) error {
 	return r.db.Transaction(fn)
-} 
+}
 
 func (r *TicketRepository) WithTransaction(
 	fn func(txRepo *TicketRepository) error,
@@ -42,19 +44,27 @@ func (r *TicketRepository) WithTransaction(
 
 /*
 =====================
- Queries
+
+	Queries
+
 =====================
 */
 func (r *TicketRepository) Create(ticket *models.Ticket) error {
 	return r.db.Create(ticket).Error
 }
 
-func (r *TicketRepository) FindByID(id uuid.UUID) (*models.Ticket, error) {
+func (r *TicketRepository) GetByID(id uuid.UUID) (*models.Ticket, error) {
 	var ticket models.Ticket
 	if err := r.db.First(&ticket, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 	return &ticket, nil
+}
+
+func (r *TicketRepository) GetAll() ([]models.Ticket, error) {
+	var tickets []models.Ticket
+	err := r.db.Order("created_at DESC").Find(&tickets).Error
+	return tickets, err
 }
 
 func (r *TicketRepository) FindByEngineer(
@@ -88,7 +98,9 @@ func (r *TicketRepository) FindByCustomer(
 
 /*
 =====================
- Assignment
+
+	Assignment
+
 =====================
 */
 func (r *TicketRepository) CreateAssignment(
@@ -104,14 +116,11 @@ func (r *TicketRepository) CreateAssignment(
 	}).Error
 }
 
-
-
 func (r *TicketRepository) UpdateStatusNoTx(
 	ticketID uuid.UUID,
 	newStatus models.TicketStatus,
-	changedBy uuid.UUID,
 ) error {
-	return r.UpdateStatus(r.db, ticketID, newStatus, changedBy)
+	return r.UpdateStatus(ticketID, newStatus)
 }
 
 /*
@@ -119,32 +128,52 @@ func (r *TicketRepository) UpdateStatusNoTx(
  Status + History
 =====================
 */
+/*
+=====================
+ Updates
+=====================
+*/
+func (r *TicketRepository) UpdateFields(
+	ticketID uuid.UUID,
+	updates map[string]interface{},
+) error {
+	return r.db.Model(&models.Ticket{}).Where("id = ?", ticketID).Updates(updates).Error
+}
+
+func (r *TicketRepository) AssignEmployee(
+	ticket *models.Ticket,
+	assignment *models.TicketAssignment,
+) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		// 1. Update Ticket (Priority, Status, etc)
+		if err := tx.Save(ticket).Error; err != nil {
+			return err
+		}
+
+		// 2. Create Assignment Record
+		if err := tx.Create(assignment).Error; err != nil {
+			return err
+		}
+
+		// 3. Create History Log
+		if err := tx.Create(&models.TicketStatusHistory{
+			TicketID:  ticket.ID,
+			OldStatus: string(models.StatusOpen), // Assuming from Open
+			NewStatus: string(ticket.Status),
+			ChangedBy: assignment.AssignedBy,
+		}).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+}
+
 func (r *TicketRepository) UpdateStatus(
-	tx *gorm.DB,
 	ticketID uuid.UUID,
 	newStatus models.TicketStatus,
-	changedBy uuid.UUID,
 ) error {
-
-	
-
-	var ticket models.Ticket
-	if err := tx.First(&ticket, "id = ?", ticketID).Error; err != nil {
-		return err
-	}
-
-	if err := tx.Model(&models.Ticket{}).
-		Where("id = ?", ticketID).
-		Update("status", newStatus).Error; err != nil {
-		return err
-	}
-
-	return tx.Create(&models.TicketStatusHistory{
-		TicketID:  ticketID,
-		OldStatus: string(ticket.Status),
-		NewStatus: string(newStatus),
-		ChangedBy: changedBy,
-	}).Error
+	return r.db.Model(&models.Ticket{}).Where("id = ?", ticketID).Update("status", newStatus).Error
 }
 
 func (r *TicketRepository) CreateStatusHistory(
@@ -162,10 +191,6 @@ func (r *TicketRepository) CreateStatusHistory(
 	}).Error
 }
 
-
-
-
-
 func (r *TicketRepository) FindOverdueTickets(
 	days int,
 ) ([]models.Ticket, error) {
@@ -178,8 +203,7 @@ func (r *TicketRepository) FindOverdueTickets(
 		Where(
 			"status NOT IN ? AND created_at < ?",
 			[]models.TicketStatus{
-				models.TicketClosedByAdmin,
-				models.TicketFeedbackGiven,
+				models.StatusClosed,
 			},
 			cutoff,
 		).
@@ -187,4 +211,3 @@ func (r *TicketRepository) FindOverdueTickets(
 
 	return tickets, err
 }
-

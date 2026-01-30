@@ -39,10 +39,9 @@ type Verify2FARequest struct {
 	Code   string    `json:"code" binding:"required,len=6"`
 }
 
-
 type LoginRequest struct {
-	Email         string `json:"email" binding:"required,email"`
-	Password      string `json:"password" binding:"required"`
+	Email          string `json:"email" binding:"required,email"`
+	Password       string `json:"password" binding:"required"`
 	RememberDevice bool   `json:"rememberDevice"`
 }
 
@@ -55,7 +54,7 @@ type RefreshRequest struct {
 }
 
 type CreateUserRequest struct {
-	Name  string      `json:"name" binding:"required"`	
+	Name  string      `json:"name" binding:"required"`
 	Email string      `json:"email" binding:"required,email"`
 	Role  models.Role `json:"role" binding:"required,oneof=admin support customer"`
 
@@ -123,7 +122,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		c.ClientIP(),
 		c.GetHeader("User-Agent"),
 	)
-fmt.Println("RememberDevice:", req.RememberDevice)
+	fmt.Println("RememberDevice:", req.RememberDevice)
 	// 🔐 2FA required
 	if err != nil && strings.HasPrefix(err.Error(), "TWO_FA_REQUIRED:") {
 		token := strings.TrimPrefix(err.Error(), "TWO_FA_REQUIRED:")
@@ -154,15 +153,11 @@ fmt.Println("RememberDevice:", req.RememberDevice)
 	// ✅ Normal login success
 	h.setRefreshCookie(c, resp.RefreshToken)
 
-	
-
-
 	c.JSON(http.StatusOK, gin.H{
 		"access_token": resp.AccessToken,
 		"user":         resp.User,
 	})
 }
-
 
 // Refresh token
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
@@ -239,7 +234,7 @@ func (h *AuthHandler) CreateUser(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
-	} 
+	}
 
 	c.JSON(http.StatusCreated, gin.H{
 		"id":      user.ID,
@@ -248,7 +243,6 @@ func (h *AuthHandler) CreateUser(c *gin.Context) {
 		"message": "User created. Password setup email sent.",
 	})
 }
-
 
 // Change password
 func (h *AuthHandler) ChangePassword(c *gin.Context) {
@@ -292,12 +286,11 @@ func (h *AuthHandler) GetMe(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"id":    user.ID,
-		"name":  user.Name,   // ✅ FROM DB
+		"name":  user.Name, // ✅ FROM DB
 		"email": user.Email,
 		"role":  user.Role,
 	})
 }
-
 
 func (h *AuthHandler) ResetPassword(c *gin.Context) {
 	var req ResetPasswordRequest
@@ -359,7 +352,6 @@ type VerifyOTPRequest struct {
 // 	})
 // }
 
-
 // func (h *AuthHandler) Verify2FA(c *gin.Context) {
 // 	var req Verify2FARequest
 // 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -377,11 +369,11 @@ type VerifyOTPRequest struct {
 
 // 	h.setRefreshCookie(c, resp.RefreshToken)
 
-// 	c.JSON(http.StatusOK, gin.H{
-// 		"access_token": resp.AccessToken,
-// 		"user":         resp.User,
-// 	})
-// }
+//		c.JSON(http.StatusOK, gin.H{
+//			"access_token": resp.AccessToken,
+//			"user":         resp.User,
+//		})
+//	}
 func (h *AuthHandler) Enable2FA(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 
@@ -410,6 +402,7 @@ func (h *AuthHandler) Disable2FA(c *gin.Context) {
 		"message": "2FA disabled successfully",
 	})
 }
+
 // func (h *AuthHandler) Verify2FA(c *gin.Context) {
 
 // 	rawToken := c.GetHeader("X-2FA-Token")
@@ -502,9 +495,21 @@ func (h *AuthHandler) Verify2FA(c *gin.Context) {
 }
 
 // Admin: Get Users (Paginated)
+// Admin: Get Users (Paginated)
 func (h *AuthHandler) GetAllUsers(c *gin.Context) {
-	page := 1
+	role := c.Query("role")
+	if role != "" {
+		// If role is provided (e.g. for dropdowns), return all users of that role (no pagination for now)
+		users, err := h.service.GetUsersByRole(models.Role(role))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch users"})
+			return
+		}
+		c.JSON(http.StatusOK, users) // Returns ARRAY directly
+		return
+	}
 
+	page := 1
 	if p := c.Query("page"); p != "" {
 		if parsed, err := strconv.Atoi(p); err == nil {
 			page = parsed
@@ -525,4 +530,13 @@ func (h *AuthHandler) GetAllUsers(c *gin.Context) {
 		"total":     total,
 		"users":     users,
 	})
+}
+
+func (h *AuthHandler) GetSupportEngineers(c *gin.Context) {
+	users, err := h.service.GetUsersByRole(models.RoleSupport)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch support engineers"})
+		return
+	}
+	c.JSON(http.StatusOK, users)
 }

@@ -78,6 +78,7 @@ func SetupRoutes(
 			// USERS
 			admin.POST("/users", authHandler.CreateUser)
 			admin.GET("/users", authHandler.GetAllUsers)
+			admin.GET("/support-engineers", authHandler.GetSupportEngineers) // New
 
 			// PRODUCTS
 			admin.POST("/products", productHandler.Create)
@@ -87,12 +88,19 @@ func SetupRoutes(
 				"/customers/:id/products",
 				customerProductHandler.AssignToCustomer,
 			)
+			admin.GET(
+				"/customers/:id/products",
+				customerProductHandler.GetCustomerProducts,
+			)
 
 			// LOOKUPS
 			admin.GET("/categories", categoryHandler.GetAll)
 			admin.POST("/categories", categoryHandler.Create)
 
 			admin.GET("/categories/:id/brands", brandHandler.GetByCategory)
+
+			// BRANDS
+			admin.GET("/brands", brandHandler.GetAll)
 			admin.POST("/brands", brandHandler.Create)
 
 			admin.GET("/brands/:id/models", modelHandler.GetByBrand)
@@ -103,8 +111,10 @@ func SetupRoutes(
 			admin.GET("/amc", amcHandler.GetAllAMCs)
 
 			// TICKETS
+			admin.GET("/tickets", ticketHandler.GetAdminTickets)    // New: List all tickets
+			admin.POST("/tickets", ticketHandler.AdminCreateTicket) // Admin Create on behalf
 			admin.POST("/tickets/:id/assign", ticketHandler.AssignTicket)
-			admin.POST("/tickets/:id/close", ticketHandler.CloseTicket)
+			// admin.POST("/tickets/:id/close", ticketHandler.CloseTicket) // Removed Admin Close for now, as Support closes it.
 		}
 
 		/* =========================
@@ -114,7 +124,8 @@ func SetupRoutes(
 		support.Use(middleware.RequireRole(models.RoleSupport))
 		{
 			support.GET("/tickets", supportDashboard.MyTickets)
-			support.POST("/tickets/:id/resolve", ticketHandler.ResolveTicket)
+			support.POST("/tickets/:id/start", ticketHandler.StartTicket) // New
+			support.POST("/tickets/:id/close", ticketHandler.CloseTicket) // Support Close (with proof)
 		}
 
 		/* =========================

@@ -61,7 +61,6 @@ func (r *AuthRepository) CreateUserTx(
 	return tx.Create(user).Error
 }
 
-
 func (r *AuthRepository) UpdateUserPassword(
 	userID uuid.UUID,
 	hashedPassword string,
@@ -251,21 +250,26 @@ func (r *AuthRepository) GetUsersPaginated(
 	}
 
 	// Fetch paginated users
-	err := r.db.
-		Where("is_active = true").
-		Order("created_at DESC").
+	query := r.db.Where("is_active = true")
+
+	if err := query.Order("created_at DESC").
 		Limit(limit).
 		Offset(offset).
 		Find(&users).
-		Error
-
-	if err != nil {
+		Error; err != nil {
 		return nil, 0, err
 	}
 
 	return users, total, nil
 }
 
+func (r *AuthRepository) GetUsersByRole(role models.Role) ([]models.User, error) {
+	var users []models.User
+	err := r.db.Where("role = ? AND is_active = true", role).
+		Order("name ASC").
+		Find(&users).Error
+	return users, err
+}
 
 func (r *AuthRepository) CreateRememberedDevice(rd *models.RememberedDevice) error {
 	return r.db.Create(rd).Error

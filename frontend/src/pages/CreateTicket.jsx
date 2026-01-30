@@ -5,7 +5,6 @@ import api from "../api/axios";
 export default function CreateTicket() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [priority, setPriority] = useState("low");
   const [productId, setProductId] = useState("");
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -33,18 +32,20 @@ export default function CreateTicket() {
 
     setLoading(true);
     try {
+      // Find the selected product to see if we have AMC data (optional optimization)
+      const selectedProduct = products.find(p => p.id === productId);
+      const amcId = selectedProduct?.amc_id; // assuming property exists, else undefined
+
       await createTicket({
         title: title.trim(),
         description: description.trim(),
-        priority,          // ✅ lowercase enum
         product_id: productId,
+        amc_id: amcId
       });
 
       alert("Ticket created successfully");
-
       setTitle("");
       setDescription("");
-      setPriority("low");
       setProductId("");
     } catch (err) {
       alert(err.response?.data?.error || "Ticket creation failed");
@@ -66,7 +67,7 @@ export default function CreateTicket() {
       {/* TITLE */}
       <input
         className="w-full border rounded px-3 py-2 mb-3"
-        placeholder="Title"
+        placeholder="Issue Title"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         required
@@ -74,20 +75,22 @@ export default function CreateTicket() {
 
       {/* DESCRIPTION */}
       <textarea
-        className="w-full border rounded px-3 py-2 mb-3"
-        placeholder="Description"
+        className="w-full border rounded px-3 py-2 mb-3 h-24"
+        placeholder="Detailed Description of the problem..."
         value={description}
         onChange={(e) => setDescription(e.target.value)}
+        required
       />
 
       {/* PRODUCT */}
+      <label className="block text-sm text-gray-600 mb-1">Select Product</label>
       <select
         className="w-full border rounded px-3 py-2 mb-3"
         value={productId}
         onChange={(e) => setProductId(e.target.value)}
         required
       >
-        <option value="">Select Product</option>
+        <option value="">-- Choose Product --</option>
         {products.map((p) => (
           <option key={p.id} value={p.id}>
             {p.name}
@@ -95,23 +98,11 @@ export default function CreateTicket() {
         ))}
       </select>
 
-      {/* PRIORITY */}
-      <select
-        className="w-full border rounded px-3 py-2 mb-4"
-        value={priority}
-        onChange={(e) => setPriority(e.target.value)}
-      >
-        <option value="low">Low</option>
-        <option value="medium">Medium</option>
-        <option value="high">High</option>
-        <option value="critical">Critical</option>
-      </select>
-
       <button
         disabled={loading}
-        className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-60"
+        className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-60 w-full font-medium"
       >
-        {loading ? "Creating..." : "Submit"}
+        {loading ? "Creating Ticket..." : "Submit Ticket"}
       </button>
     </form>
   );

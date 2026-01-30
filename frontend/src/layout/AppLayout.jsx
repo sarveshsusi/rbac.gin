@@ -10,21 +10,23 @@ function LayoutContent() {
   const location = useLocation();
 
   const pageTitleMap = {
-  "/dashboard": "Dashboard",
-  "/customer/dashboard": "Dashboard",
+    "/dashboard": "Dashboard",
+    "/customer/dashboard": "Dashboard",
 
-  "/admin/users": "Admin Users",
-  "/admin/products": "Products",
-  "/admin/amc": "AMC Contracts",
-  "/admin/assign-products": "Assign Products",
+    "/admin/users": "Admin Users",
+    "/admin/products": "Products",
+    "/admin/amc": "AMC Contracts",
+    "/admin/assign-products": "Assign Products",
 
-  "/support/tickets": "My Tickets",
+    "/support/tickets": "My Tickets",
 
-  "/customer/tickets": "My Tickets",
-  "/customer/amc": "My AMC",
+    "/customer/tickets": "My Tickets",
+    "/customer/amc": "My AMC",
 
-  "/tickets/new": "Create Ticket",
-};
+    "/tickets/new": "Create Ticket",
+    "/admin/tickets": "Ticket Assignment",
+    "/admin/tickets/new": "Create Ticket (Admin)",
+  };
 
 
   const title =

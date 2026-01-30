@@ -53,6 +53,12 @@ export const SIDEBAR_ITEMS = [
     icon: Users,
     roles: ["admin"],
   },
+  {
+    label: "Ticket Review",
+    path: "/admin/tickets",
+    icon: Ticket,
+    roles: ["admin"],
+  },
 
   /* =====================
      SUPPORT
@@ -63,13 +69,13 @@ export const SIDEBAR_ITEMS = [
     icon: Ticket,
     roles: ["support"],
   },
- 
-{
-  label: "Assign Products",
-  path: "/admin/assign-products",
-  roles: ["admin"],
-  icon: UserPlus,
-},
+
+  {
+    label: "Assign Products",
+    path: "/admin/assign-products",
+    roles: ["admin"],
+    icon: UserPlus,
+  },
 
   /* =====================
      CUSTOMER
@@ -87,11 +93,11 @@ export const SIDEBAR_ITEMS = [
     roles: ["customer"],
   },
   {
-  label: "Create Ticket",
-  path: "/tickets/new",
-  icon: Ticket,
-  roles: ["customer"],
-},
+    label: "Create Ticket",
+    path: "/tickets/new",
+    icon: Ticket,
+    roles: ["customer"],
+  },
 
   /* =====================
      SETTINGS

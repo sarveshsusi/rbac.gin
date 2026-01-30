@@ -3,21 +3,18 @@ package domain
 import "rbac/models"
 
 var ValidTransitions = map[models.TicketStatus][]models.TicketStatus{
-	models.TicketCustomerCreated: {
-		models.TicketAdminReviewed,
+	models.StatusOpen: {
+		models.StatusAssigned,
+		models.StatusClosed,
 	},
-	models.TicketAdminReviewed: {
-		models.TicketAssignedSupport,
+	models.StatusAssigned: {
+		models.StatusInProgress,
+		models.StatusClosed,
 	},
-	models.TicketAssignedSupport: {
-		models.TicketResolvedSupport,
+	models.StatusInProgress: {
+		models.StatusClosed,
 	},
-	models.TicketResolvedSupport: {
-		models.TicketClosedByAdmin,
-	},
-	models.TicketClosedByAdmin: {
-		models.TicketFeedbackGiven,
-	},
+	models.StatusClosed: {},
 }
 
 func CanTransition(from, to models.TicketStatus) bool {

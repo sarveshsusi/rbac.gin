@@ -39,14 +39,12 @@ type User struct {
 	MustResetPassword bool       `gorm:"default:false"`
 	CreatedBy         *uuid.UUID `gorm:"type:uuid;index"`
 
-	TwoFAEnabled bool       `gorm:"column:two_fa_enabled;default:false"`
+	TwoFAEnabled bool `gorm:"column:two_fa_enabled;default:false"`
 	LastLoginAt  *time.Time
 
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
-
-
 
 type RefreshToken struct {
 	ID        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
@@ -59,6 +57,10 @@ type RefreshToken struct {
 	User User `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
 }
 
+func (RefreshToken) TableName() string {
+	return "refresh_tokens"
+}
+
 type PasswordResetToken struct {
 	ID        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	UserID    uuid.UUID `gorm:"type:uuid;not null"`
@@ -68,11 +70,19 @@ type PasswordResetToken struct {
 	CreatedAt time.Time
 }
 
+func (PasswordResetToken) TableName() string {
+	return "password_reset_tokens"
+}
+
 type TwoFAOTP struct {
 	ID        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	UserID    uuid.UUID `gorm:"index"`
+	UserID    uuid.UUID `gorm:"type:uuid;index"`
 	Code      string
 	ExpiresAt time.Time
 	Used      bool
 	CreatedAt time.Time
+}
+
+func (TwoFAOTP) TableName() string {
+	return "two_fa_otps"
 }

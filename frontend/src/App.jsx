@@ -28,6 +28,7 @@ import CustomerAMCs from "./pages/CustomerAMCs";
 import CreateTicket from "./pages/CreateTicket";
 import TicketDetail from "./pages/TicketDetail";
 import AdminCreateProductAllInOne from "./pages/AdminCreateProductAllInOne";
+import AdminCreateTicket from "./pages/AdminCreateTicket";
 
 function App() {
   const { loading } = useAuth();
@@ -74,6 +75,7 @@ function App() {
           <Route path="/admin/assign-products" element={<AdminProductAssignment />} />
           <Route path="/admin/amc" element={<AdminAMCs />} />
           <Route path="/admin/tickets" element={<AdminTicketAssignment />} />
+          <Route path="/admin/tickets/new" element={<AdminCreateTicket />} />
 
           {/* SUPPORT */}
           <Route path="/support/tickets" element={<SupportTickets />} />

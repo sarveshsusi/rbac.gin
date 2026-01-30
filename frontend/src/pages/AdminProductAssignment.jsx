@@ -21,7 +21,7 @@ export default function AdminProductAssignment() {
     (async () => {
       try {
         const [u, p] = await Promise.all([
-          api.get("/admin/users"),
+          api.get("/admin/users?role=customer"), // Only fetch customers
           api.get("/admin/products"),
         ]);
 

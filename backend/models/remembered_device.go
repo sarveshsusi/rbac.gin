@@ -15,3 +15,7 @@ type RememberedDevice struct {
 	ExpiresAt time.Time `gorm:"not null"`
 	CreatedAt time.Time
 }
+
+func (RememberedDevice) TableName() string {
+	return "remembered_devices"
+}

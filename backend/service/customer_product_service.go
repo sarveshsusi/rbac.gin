@@ -34,7 +34,6 @@ func NewCustomerProductService(
 // 	return s.repo.Assign(customerID, productID)
 // }
 
-
 func (s *CustomerProductService) AssignProductToCustomer(
 	userID uuid.UUID,
 	productID uuid.UUID,
@@ -46,4 +45,33 @@ func (s *CustomerProductService) AssignProductToCustomer(
 	}
 
 	return s.repo.Assign(customer.ID, productID)
+}
+
+type CustomerProductResponse struct {
+	ID          uuid.UUID `json:"id"`
+	ProductID   uuid.UUID `json:"product_id"`
+	ProductName string    `json:"product_name"`
+}
+
+func (s *CustomerProductService) GetCustomerProductsByUserID(userID uuid.UUID) ([]CustomerProductResponse, error) {
+	// Resolve Customer ID from User ID
+	customer, err := s.repo.GetCustomerByUserID(userID)
+	if err != nil {
+		return nil, errors.New("customer profile not found")
+	}
+
+	products, err := s.repo.GetByCustomerID(customer.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	var response []CustomerProductResponse
+	for _, p := range products {
+		response = append(response, CustomerProductResponse{
+			ID:          p.ID,
+			ProductID:   p.ProductID,
+			ProductName: p.Product.Name,
+		})
+	}
+	return response, nil
 }

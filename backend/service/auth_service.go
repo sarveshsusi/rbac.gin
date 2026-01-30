@@ -20,11 +20,11 @@ import (
 
 type AuthService struct {
 	db           *gorm.DB
-	repo      *repository.AuthRepository
-	deviceRepo *repository.RememberedDeviceRepo
-	customerRepo *repository.CustomerRepository 
-	mailer    *utils.Mailer
-	cfg       *config.Config
+	repo         *repository.AuthRepository
+	deviceRepo   *repository.RememberedDeviceRepo
+	customerRepo *repository.CustomerRepository
+	mailer       *utils.Mailer
+	cfg          *config.Config
 }
 
 func NewAuthService(
@@ -36,14 +36,13 @@ func NewAuthService(
 ) *AuthService {
 	return &AuthService{
 		db:           db,
-		repo:      repo,
-		deviceRepo: deviceRepo,
-		customerRepo: customerRepo, 
-		mailer:    utils.NewMailer(cfg.Mail),
-		cfg:       cfg,
+		repo:         repo,
+		deviceRepo:   deviceRepo,
+		customerRepo: customerRepo,
+		mailer:       utils.NewMailer(cfg.Mail),
+		cfg:          cfg,
 	}
 }
-
 
 /*
 =====================
@@ -58,21 +57,20 @@ type LoginResponse struct {
 }
 
 type UserInfo struct {
-	ID    uuid.UUID `json:"id"`
-	Name  string    `json:"name"`
-	Email string    `json:"email"`
+	ID    uuid.UUID   `json:"id"`
+	Name  string      `json:"name"`
+	Email string      `json:"email"`
 	Role  models.Role `json:"role"`
 }
 
 type GetuserInfo struct {
-	ID    uuid.UUID `json:"id"`
-	Name  string    `json:"name"`
-	Email string    `json:"email"`
-	Role  models.Role `json:"role"`
-	CreatedAt time.Time `json:"created_at"`
-	IsActive  bool      `json:"is_active"`
+	ID        uuid.UUID   `json:"id"`
+	Name      string      `json:"name"`
+	Email     string      `json:"email"`
+	Role      models.Role `json:"role"`
+	CreatedAt time.Time   `json:"created_at"`
+	IsActive  bool        `json:"is_active"`
 }
-
 
 /*
 =====================
@@ -186,7 +184,6 @@ func (s *AuthService) Login(
 	}, nil
 }
 
-
 /*
 =====================
  Refresh Token (ROTATION)
@@ -271,8 +268,6 @@ func (s *AuthService) Logout(
  Admin: Create User
 =====================
 */
-
-
 
 /*
 =====================
@@ -384,7 +379,6 @@ func (s *AuthService) ResetPassword(
 	return s.repo.MarkPasswordResetUsed(reset.ID)
 }
 
-
 func (s *AuthService) CreateUser(
 	name string,
 	email string,
@@ -439,9 +433,9 @@ func (s *AuthService) CreateUser(
 		if role == models.RoleCustomer {
 			customer := &models.Customer{
 				UserID:   user.ID,
-				Company: company,
-				Phone:   phone,
-				Address: address,
+				Company:  company,
+				Phone:    phone,
+				Address:  address,
 				IsActive: true,
 			}
 
@@ -491,7 +485,6 @@ func (s *AuthService) CreateUser(
 
 	return createdUser, nil
 }
-
 
 func (s *AuthService) SendPasswordResetEmail(email string) error {
 	user, err := s.repo.FindUserByEmail(email)
@@ -560,7 +553,7 @@ func (s *AuthService) sendOTP(user *models.User) error {
 func (s *AuthService) Verify2FA(
 	userID uuid.UUID,
 	code string,
-	remember bool,        // 👈 from 2FA JWT
+	remember bool, // 👈 from 2FA JWT
 	ip string,
 	userAgent string,
 ) (*LoginResponse, *string, error) {
@@ -614,8 +607,6 @@ func (s *AuthService) Verify2FA(
 	return resp, rememberDeviceToken, nil
 }
 
-
-
 func (s *AuthService) issueTokens(user *models.User) (*LoginResponse, error) {
 
 	accessToken, err := utils.GenerateAccessToken(
@@ -660,9 +651,7 @@ func (s *AuthService) Enable2FA(userID uuid.UUID) error {
 
 func (s *AuthService) Disable2FA(userID uuid.UUID) error {
 	return s.repo.Disable2FA(userID)
-} 
-
-
+}
 
 func generateOTP() (string, error) {
 	n, err := rand.Int(rand.Reader, big.NewInt(1000000))
@@ -693,14 +682,34 @@ func (s *AuthService) GetUsersPaginated(page int) ([]*GetuserInfo, int64, error)
 	result := make([]*GetuserInfo, 0, len(users))
 	for _, u := range users {
 		result = append(result, &GetuserInfo{
-			ID:    u.ID,
-			Name:  u.Name,
-			Email: u.Email,
-			Role:  u.Role,
+			ID:        u.ID,
+			Name:      u.Name,
+			Email:     u.Email,
+			Role:      u.Role,
 			CreatedAt: u.CreatedAt,
-			IsActive: u.IsActive,
+			IsActive:  u.IsActive,
 		})
 	}
 
 	return result, total, nil
+}
+
+func (s *AuthService) GetUsersByRole(role models.Role) ([]*GetuserInfo, error) {
+	users, err := s.repo.GetUsersByRole(role)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]*GetuserInfo, 0, len(users))
+	for _, u := range users {
+		result = append(result, &GetuserInfo{
+			ID:        u.ID,
+			Name:      u.Name,
+			Email:     u.Email,
+			Role:      u.Role,
+			CreatedAt: u.CreatedAt,
+			IsActive:  u.IsActive,
+		})
+	}
+	return result, nil
 }

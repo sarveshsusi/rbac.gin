@@ -3,9 +3,10 @@ package repository
 import (
 	"time"
 
+	"rbac/models"
+
 	"github.com/google/uuid"
 	"gorm.io/gorm"
-	"rbac/models"
 )
 
 type EscalationRepository struct {
@@ -16,9 +17,12 @@ func NewEscalationRepository(db *gorm.DB) *EscalationRepository {
 	return &EscalationRepository{db: db}
 }
 
-/* =====================
-   Find overdue tickets
-===================== */
+/*
+	=====================
+	  Find overdue tickets
+
+=====================
+*/
 func (r *EscalationRepository) FindOverdueTickets(
 	olderThan time.Time,
 ) ([]models.Ticket, error) {
@@ -35,7 +39,7 @@ func (r *EscalationRepository) FindOverdueTickets(
 				WHERE resolved = false
 			)
 		`,
-			models.TicketClosedByAdmin,
+			models.StatusClosed,
 			olderThan,
 		).
 		Find(&tickets).Error
@@ -43,9 +47,12 @@ func (r *EscalationRepository) FindOverdueTickets(
 	return tickets, err
 }
 
-/* =====================
-   Mark escalated
-===================== */
+/*
+	=====================
+	  Mark escalated
+
+=====================
+*/
 func (r *EscalationRepository) MarkEscalated(
 	ticketID uuid.UUID,
 ) error {

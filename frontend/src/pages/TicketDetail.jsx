@@ -1,27 +1,56 @@
 import { useAuth } from "../auth/useAuth";
 import {
-  resolveTicket,
+  startTicket,
   closeTicket,
   submitFeedback,
 } from "../api/ticket.api";
+import { useState } from "react";
 
 export default function TicketDetail({ ticket, onUpdate }) {
   const { user } = useAuth();
+  const [proof, setProof] = useState(null);
+  const [uploading, setUploading] = useState(false);
 
   /* =====================
-     SUPPORT: RESOLVE
+     SUPPORT: START
   ====================== */
-  const handleResolve = async () => {
-    await resolveTicket(ticket.id);
-    onUpdate?.();
+  const handleStart = async () => {
+    try {
+      await startTicket(ticket.id);
+      onUpdate?.();
+    } catch (err) {
+      alert("Failed to start ticket");
+    }
   };
 
   /* =====================
-     ADMIN: CLOSE
+     SUPPORT: CLOSE
   ====================== */
-  const handleClose = async () => {
-    await closeTicket(ticket.id);
-    onUpdate?.();
+  const handleSupportClose = async () => {
+    if (!proof) return alert("Proof image is required");
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("proof", proof);
+      await closeTicket(ticket.id, formData);
+      onUpdate?.();
+      alert("Ticket closed successfully");
+    } catch (err) {
+      alert("Failed: " + (err.response?.data?.error || err.message));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  /* =====================
+     ADMIN: CLOSE (Force)
+  ====================== */
+  const handleAdminClose = async () => {
+    // Admin closing might not require proof or different endpoint, but using same for now implies support flow.
+    // Ideally Admin uses a different endpoint or we skip proof. 
+    // For now hiding Admin Close or making it just an alert that Support should close.
+    alert("Please assign to Support to close with proof.");
   };
 
   /* =====================
@@ -49,24 +78,45 @@ export default function TicketDetail({ ticket, onUpdate }) {
       {/* =====================
           SUPPORT ACTION
       ====================== */}
-      {user.role === "support" &&
-        ticket.status === "assigned_to_support" && (
-          <button
-            onClick={handleResolve}
-            className="bg-green-600 text-white px-4 py-1.5 rounded text-sm"
-          >
-            Resolve Ticket
-          </button>
-        )}
+      {user.role === "support" && (
+        <div className="flex gap-2 items-center mt-2">
+          {ticket.status === "Assigned" && (
+            <button
+              onClick={handleStart}
+              className="bg-blue-600 text-white px-4 py-1.5 rounded text-sm"
+            >
+              Start Work
+            </button>
+          )}
+
+          {ticket.status === "In Progress" && (
+            <div className="flex flex-col gap-2">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setProof(e.target.files[0])}
+                className="text-xs"
+              />
+              <button
+                onClick={handleSupportClose}
+                disabled={uploading || !proof}
+                className="bg-green-600 text-white px-4 py-1.5 rounded text-sm disabled:opacity-50"
+              >
+                {uploading ? "Closing..." : "Close Ticket (with Proof)"}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* =====================
           ADMIN ACTION
       ====================== */}
       {user.role === "admin" &&
-        ticket.status === "resolved_by_support" && (
+        ticket.status === "In Progress" && ( // Example condition
           <button
-            onClick={handleClose}
-            className="bg-red-600 text-white px-4 py-1.5 rounded text-sm"
+            onClick={handleAdminClose}
+            className="bg-gray-500 text-white px-4 py-1.5 rounded text-sm"
           >
             Close Ticket
           </button>

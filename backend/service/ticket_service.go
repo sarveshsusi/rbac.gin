@@ -6,185 +6,168 @@ import (
 
 	"github.com/google/uuid"
 
-	"rbac/domain"
 	"rbac/models"
 	"rbac/repository"
 )
 
 type TicketService struct {
-	repo           *repository.TicketRepository
-	attachmentRepo *repository.TicketAttachmentRepository
-	escalationRepo *repository.TicketEscalationRepository
+	repo *repository.TicketRepository
 }
 
-func NewTicketService(
-	repo *repository.TicketRepository,
-	attachmentRepo *repository.TicketAttachmentRepository,
-	escalationRepo *repository.TicketEscalationRepository,
-) *TicketService {
-	return &TicketService{
-		repo:           repo,
-		attachmentRepo: attachmentRepo,
-		escalationRepo: escalationRepo,
-	}
+func NewTicketService(repo *repository.TicketRepository) *TicketService {
+	return &TicketService{repo: repo}
 }
 
-/* =====================
-   CREATE TICKET (CUSTOMER)
-===================== */
-func (s *TicketService) CreateTicket(
+/*
+	=========================
+	  CUSTOMER: CREATE TICKET
+	=========================
+*/
+// CreateCustomerTicket - Customer only provides title and description
+func (s *TicketService) CreateCustomerTicket(
 	customerID uuid.UUID,
-	title string,
-	description string,
-	productID uuid.UUID,
-	amc models.AMCContract,
+	title, description string,
 ) (*models.Ticket, error) {
 
-	target := time.Now().Add(time.Duration(amc.SLAHours) * time.Hour)
-
+	// Customer creates ticket with minimal info
+	// Admin will assign product, AMC, priority, support mode, etc. later
 	ticket := &models.Ticket{
+		ID:          uuid.New(),
 		CustomerID:  customerID,
-		ProductID:   productID,
-		AMCId:       amc.ID,
 		Title:       title,
 		Description: description,
-		Priority:    models.PriorityLow, // enforced
-		Status:      models.TicketCustomerCreated,
-		SLAHours:    amc.SLAHours,
-		TargetAt:    &target,
+		Status:      models.StatusOpen,
 		CreatedBy:   customerID,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
 	}
 
 	if err := s.repo.Create(ticket); err != nil {
 		return nil, err
 	}
-
 	return ticket, nil
 }
 
-/* =====================
-   INTERNAL: STATE CHANGE
-===================== */
-func (s *TicketService) changeStatus(
-	ticketID uuid.UUID,
-	newStatus models.TicketStatus,
-	by uuid.UUID,
+// CreateTicket - Legacy method, kept for backward compatibility if needed
+func (s *TicketService) CreateTicket(
+	customerID, productID, amcID uuid.UUID,
+	title, description string,
+) (*models.Ticket, error) {
+
+	// 1. Create ticket
+	ticket := &models.Ticket{
+		ID:          uuid.New(),
+		CustomerID:  customerID,
+		ProductID:   productID,
+		AMCId:       amcID,
+		Title:       title,
+		Description: description,
+		Status:      models.StatusOpen, // Default Status
+	}
+
+	if err := s.repo.Create(ticket); err != nil {
+		return nil, err
+	}
+	return ticket, nil
+}
+
+/*
+	=========================
+	  ADMIN: CREATE TICKET (ON BEHALF)
+
+=========================
+*/
+func (s *TicketService) AdminCreateTicket(
+	ticket *models.Ticket,
+) (*models.Ticket, error) {
+	// Admin sets everything upfront
+	ticket.Status = models.StatusOpen
+
+	if err := s.repo.Create(ticket); err != nil {
+		return nil, err
+	}
+	return ticket, nil
+}
+
+/*
+	=========================
+	  ADMIN: ASSIGN TICKET
+
+=========================
+*/
+func (s *TicketService) AssignTicket(
+	ticketID, engineerID, adminID uuid.UUID,
+	priority models.TicketPriority,
+	supportMode models.SupportMode,
+	serviceType models.ServiceCallType,
 ) error {
 
-	ticket, err := s.repo.FindByID(ticketID)
+	// 1. Get Ticket
+	ticket, err := s.repo.GetByID(ticketID)
 	if err != nil {
 		return err
 	}
 
-	if !domain.CanTransition(ticket.Status, newStatus) {
-		return errors.New("invalid ticket status transition")
+	// 2. Update Fields
+	ticket.Priority = priority
+	ticket.SupportMode = supportMode
+	ticket.ServiceCallType = serviceType
+	ticket.Status = models.StatusAssigned // Update Status
+
+	// 3. Create Assignment Record
+	assignment := &models.TicketAssignment{
+		TicketID:   ticketID,
+		EngineerID: engineerID,
+		AssignedBy: adminID,
+		AssignedAt: time.Now(),
 	}
 
-	return s.repo.UpdateStatus(
-		s.repo.DB(),
-		ticketID,
-		newStatus,
-		by,
-	)
+	// 4. Save Updates (Transaction ideally)
+	// For simplicity, calling repository method that handles update + assignment
+	return s.repo.AssignEmployee(ticket, assignment)
 }
 
-/* =====================
-   ADMIN REVIEW
-===================== */
-func (s *TicketService) AdminReviewTicket(
-	ticketID uuid.UUID,
-	adminID uuid.UUID,
-) error {
-	return s.changeStatus(
-		ticketID,
-		models.TicketAdminReviewed,
-		adminID,
-	)
+/*
+	=========================
+	  SUPPORT: START TICKET
+
+=========================
+*/
+func (s *TicketService) StartTicket(ticketID uuid.UUID) error {
+	return s.repo.UpdateStatus(ticketID, models.StatusInProgress)
 }
 
-/* =====================
-   ADMIN ASSIGN
-===================== */
-func (s *TicketService) AssignTicket(
-	ticketID uuid.UUID,
-	engineerID uuid.UUID,
-	adminID uuid.UUID,
-	productID uuid.UUID,
-	priority models.TicketPriority,
-) error {
+/*
+	=========================
+	  SUPPORT: CLOSE TICKET
 
-	return s.repo.WithTransaction(func(tx *repository.TicketRepository) error {
-
-		if err := tx.CreateAssignment(ticketID, engineerID, adminID); err != nil {
-			return err
-		}
-
-		if err := tx.DB().
-			Model(&models.Ticket{}).
-			Where("id = ?", ticketID).
-			Updates(map[string]interface{}{
-				"priority":   priority,
-				"product_id": productID,
-			}).Error; err != nil {
-			return err
-		}
-
-		return s.changeStatus(
-			ticketID,
-			models.TicketAssignedSupport,
-			adminID,
-		)
-	})
-}
-
-/* =====================
-   SUPPORT RESOLVE
-===================== */
-func (s *TicketService) ResolveTicket(
-	ticketID uuid.UUID,
-	engineerID uuid.UUID,
-) error {
-	return s.changeStatus(
-		ticketID,
-		models.TicketResolvedSupport,
-		engineerID,
-	)
-}
-
-/* =====================
-   ADMIN CLOSE
-===================== */
+=========================
+*/
 func (s *TicketService) CloseTicket(
 	ticketID uuid.UUID,
-	adminID uuid.UUID,
+	proofImageURL string,
 ) error {
 
-	if err := s.changeStatus(
-		ticketID,
-		models.TicketClosedByAdmin,
-		adminID,
-	); err != nil {
-		return err
+	if proofImageURL == "" {
+		return errors.New("proof image is mandatory to close ticket")
 	}
 
-	// clear escalation record if exists
-	return s.escalationRepo.ResolveByTicket(ticketID)
+	// Update Ticket: Status Closed, ClosedAt, ProofImage
+	updates := map[string]interface{}{
+		"status":              models.StatusClosed,
+		"closed_at":           time.Now(),
+		"closure_proof_image": proofImageURL,
+	}
+
+	return s.repo.UpdateFields(ticketID, updates)
 }
 
-/* =====================
-   ATTACHMENT (IMAGEKIT URL)
-===================== */
-func (s *TicketService) AddAttachment(
-	ticketID uuid.UUID,
-	url string,
-	fileType string,
-	userID uuid.UUID,
-) error {
+/*
+	=========================
+	  GET TICKETS
 
-	return s.attachmentRepo.Create(
-		ticketID,
-		url,
-		fileType,
-		userID,
-	)
+=========================
+*/
+func (s *TicketService) GetAll() ([]models.Ticket, error) {
+	return s.repo.GetAll()
 }

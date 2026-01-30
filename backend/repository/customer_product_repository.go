@@ -33,8 +33,6 @@ func (r *CustomerProductRepository) Exists(
 	return count > 0, err
 }
 
-
-
 func (r *CustomerProductRepository) GetCustomerByUserID(
 	userID uuid.UUID,
 ) (*models.Customer, error) {
@@ -66,3 +64,9 @@ func (r *CustomerProductRepository) Assign(
 		}).Error
 }
 
+func (r *CustomerProductRepository) GetByCustomerID(customerID uuid.UUID) ([]models.CustomerProduct, error) {
+	var results []models.CustomerProduct
+	err := r.db.Preload("Product").Where("customer_id = ? AND is_active = true", customerID).
+		Find(&results).Error
+	return results, err
+}
